@@ -1,0 +1,29 @@
+SocialChain/
+│── backend/
+│   ├── blockchain/        # Blockchain-related scripts & smart contract interactions
+│   ├── config/            # Configuration files (e.g., database connection)
+│   ├── controllers/       # Business logic for handling requests
+│   ├── middleware/        # Authentication, logging, error handling, etc.
+│   ├── models/            # Mongoose models for database schema
+│   ├── routes/            # Express API routes (auth, blockchain, posts, users, etc.)
+│   ├── utils/             # Helper functions (e.g., JWT, hashing, formatting)
+│   ├── index.js           # Main server file
+│   ├── .env               # Environment variables
+│   ├── package.json       # Dependencies and scripts
+│   └── README.md          # Backend documentation
+│
+│── frontend/
+│   ├── src/
+│   │   ├── auth/          # Authentication components (login, signup, etc.)
+│   │   ├── components/    # Reusable UI components
+│   │   ├── context/       # Global state management (React Context, Redux if needed)
+│   │   ├── pages/         # Page components (Home, Profile, Dashboard, etc.)
+│   │   ├── utils/         # Helper functions (API calls, blockchain utilities)
+│   │   ├── App.js         # Main React App component
+│   │   ├── index.js       # React entry point
+│   ├── public/            # Static assets
+│   ├── package.json       # Dependencies and scripts
+│   ├── README.md          # Frontend documentation
+│
+│── README.md              # Project documentation
+│── .gitignore             # Git ignore file

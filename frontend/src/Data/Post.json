@@ -1,0 +1,46 @@
+{
+    "posts": [
+      {
+        "id": 1,
+        "userId": "user1",
+        "username": "john_doe",
+        "profileImage": "https://example.com/profile.jpg",
+        "image": "https://images.unsplash.com/photo-1739036462754-6e86520998a2?q=80&w=2075&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        "likes": 123,
+        "caption": "Beautiful sunset 🌅",
+        "comments": [
+          {"id": 1, "user": "jane_smith", "text": "Amazing!"},
+          {"id": 2, "user": "mike_jones", "text": "Wow!"}
+        ],
+        "timestamp": "2023-07-15T12:00:00Z"
+      },
+      {
+        "id": 1,
+        "userId": "user1",
+        "username": "john_doe",
+        "profileImage": "https://example.com/profile.jpg",
+        "image": "https://images.unsplash.com/photo-1739036462754-6e86520998a2?q=80&w=2075&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        "likes": 123,
+        "caption": "Beautiful sunset 🌅",
+        "comments": [
+          {"id": 1, "user": "jane_smith", "text": "Amazing!"},
+          {"id": 2, "user": "mike_jones", "text": "Wow!"}
+        ],
+        "timestamp": "2023-07-15T12:00:00Z"
+      },
+      {
+        "id": 1,
+        "userId": "user1",
+        "username": "john_doe",
+        "profileImage": "https://example.com/profile.jpg",
+        "image": "https://images.unsplash.com/photo-1739036462754-6e86520998a2?q=80&w=2075&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        "likes": 123,
+        "caption": "Beautiful sunset 🌅",
+        "comments": [
+          {"id": 1, "user": "jane_smith", "text": "Amazing!"},
+          {"id": 2, "user": "mike_jones", "text": "Wow!"}
+        ],
+        "timestamp": "2023-07-15T12:00:00Z"
+      }
+    ]
+  }
