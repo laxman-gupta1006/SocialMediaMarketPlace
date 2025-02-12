@@ -1,0 +1,47 @@
+{
+    "conversations": [
+      {
+        "id": 1,
+        "name": "Design Team",
+        "isGroup": true,
+        "avatar": "",
+        "participants": [
+          {"id": 1, "name": "Alice", "avatar": "", "online": true},
+          {"id": 2, "name": "Bob", "avatar": "", "online": false}
+        ],
+        "messages": [
+          {
+            "id": 1,
+            "text": "Here are the latest mockups",
+            "sender": "alice",
+            "timestamp": "10:30 AM",
+            "attachments": [
+              {"type": "image", "url": "/images/mockup1.jpg"},
+              {"type": "file", "name": "specs.pdf"}
+            ]
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "name": "John Doe",
+        "isGroup": false,
+        "avatar": "/images/john.jpg",
+        "lastMessage": "Thanks for the feedback!",
+        "timestamp": "9:45 AM",
+        "unread": 2,
+        "messages": [
+          {
+            "id": 1,
+            "text": "Here are the latest mockups",
+            "sender": "alice",
+            "timestamp": "10:30 AM",
+            "attachments": [
+              {"type": "image", "url": "/images/mockup1.jpg"},
+              {"type": "file", "name": "specs.pdf"}
+            ]
+          }
+        ]
+      }
+    ]
+  }
