@@ -1,19 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Grid,
-  Typography,
-  Button,
-  CircularProgress,
-  Paper,
-  Box
-} from '@mui/material';
-import { Add, Search, ShoppingCart } from '@mui/icons-material';
-import AddProductDialog from '../components/Marketplace/AddProduct';
+import { Grid, CircularProgress, Box } from '@mui/material';
+import MarketplaceLogo from '../components/Marketplace/Marketplacelogo';
 import ProductCard from '../components/Marketplace/ProductCard';
 import SearchBar from '../components/Marketplace/SearchBar';
+import AddProductDialog from '../components/Marketplace/AddProduct';
+import marketplaceItems from '../Data/marketplaceitems.json';
+
 const MarketplacePage = () => {
   const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [openDialog, setOpenDialog] = useState(false);
   const [newProduct, setNewProduct] = useState({
@@ -23,37 +18,17 @@ const MarketplacePage = () => {
     image: '',
   });
 
-  // Mock data for demonstration
-  const mockProducts = [
-    {
-      id: 1,
-      title: 'Digital Art #1',
-      description: 'A beautiful digital artwork',
-      price: '0.1 ETH',
-      image: 'https://via.placeholder.com/300',
-      owner: '0x123...abc',
-    },
-    {
-      id: 2,
-      title: 'AI-Generated Art',
-      description: 'Unique AI-generated piece',
-      price: '0.2 ETH',
-      image: 'https://via.placeholder.com/300',
-      owner: '0x456...def',
-    },
-  ];
-
   useEffect(() => {
     setLoading(true);
     setTimeout(() => {
-      setProducts(mockProducts);
+      setProducts(marketplaceItems.products);
       setLoading(false);
     }, 1000);
   }, []);
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
-    setProducts(mockProducts.filter(product =>
+    setProducts(marketplaceItems.products.filter(product =>
       product.title.toLowerCase().includes(e.target.value.toLowerCase())
     ));
   };
@@ -68,33 +43,38 @@ const MarketplacePage = () => {
     setNewProduct({ title: '', description: '', price: '', image: '' });
   };
 
+  const handleBuyProduct = (product) => {
+    alert(`Purchasing: ${product.title}`);
+  };
+
   return (
     <Box sx={{ 
-      maxWidth: 1200, 
+      maxWidth: 1440, 
       margin: '0 auto', 
       p: 3,
-      backgroundColor: 'background.paper'
+      minHeight: '100vh'
     }}>
       {/* Header Section */}
       <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        mb: 4,
-        p: 2,
-        borderRadius: 2,
-        boxShadow: 1,
-        backgroundColor: 'background.default'
-      }}>
-        <Typography variant="h4" component="h1">
-          Digital Marketplace
-        </Typography>
-        <SearchBar 
-          searchTerm={searchTerm}
-          onSearch={handleSearch}
-          onAddProduct={() => setOpenDialog(true)}
-        />
-      </Box>
+  mb: 4,
+  p: 3,
+  borderRadius: 3,
+  background: 'linear-gradient(45deg, #f8fafc 30%, #f1f5f9 90%)',
+  boxShadow: 2
+}}>
+  <Grid container alignItems="center" spacing={3}>
+    <Grid item xs={12} md={5} lg={4}>
+      <MarketplaceLogo />
+    </Grid>
+    <Grid item xs={12} md={7} lg={8}>
+      <SearchBar 
+        searchTerm={searchTerm}
+        onSearch={handleSearch}
+        onAddProduct={() => setOpenDialog(true)}
+      />
+    </Grid>
+  </Grid>
+</Box>
 
       {/* Product Grid */}
       {loading ? (
@@ -104,15 +84,24 @@ const MarketplacePage = () => {
           alignItems: 'center', 
           height: '50vh'
         }}>
-          <CircularProgress size={60} />
+          <CircularProgress 
+            size={60} 
+            sx={{ 
+              color: 'primary.main',
+              animationDuration: '0.8s',
+              '& .MuiCircularProgress-circle': {
+                strokeLinecap: 'round'
+              }
+            }}
+          />
         </Box>
       ) : (
-        <Grid container spacing={3}>
+        <Grid container spacing={4}>
           {products.map(product => (
-            <Grid item xs={12} sm={6} md={4} key={product.id}>
+            <Grid item xs={12} sm={6} lg={4} key={product.id}>
               <ProductCard 
-                product={product}
-                onBuy={() => alert(`Buying ${product.title}`)}
+                product={product} 
+                onBuy={handleBuyProduct}
               />
             </Grid>
           ))}

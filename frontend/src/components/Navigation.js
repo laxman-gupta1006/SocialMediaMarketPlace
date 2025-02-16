@@ -128,18 +128,17 @@ const Navigation = () => {
       bottom: 0,
       left: 0,
       right: 0,
-      backdropFilter: 'blur(20px)',
-      backgroundColor: 'rgba(255, 255, 255, 0.9)', // Milky white with transparency
-      borderTop: '1px solid rgba(255, 255, 255, 0.3)', // Subtle top border
-      boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.06)', // Soft shadow
+      backgroundColor: '#ffffff', // Explicit white color
+      borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+      boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.1)',
       borderRadius: '24px 24px 0 0',
-      zIndex: 1000
+      zIndex: 1000,
     }}>
       <BottomNavigation
         value={value}
         onChange={(_, newValue) => setValue(newValue)}
         sx={{
-          backgroundColor: 'transparent !important',
+          backgroundColor: '#ffffff !important', // Force white background
           height: '72px',
           padding: '0 24px',
           '& .MuiBottomNavigationAction-root': {
@@ -148,12 +147,13 @@ const Navigation = () => {
             transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             '&.Mui-selected': {
               transform: 'translateY(-8px)',
+              backgroundColor: 'rgba(25, 118, 210, 0.08)',
               '& svg': {
-                filter: 'drop-shadow(0 4px 8px rgba(37, 99, 235, 0.15))'
+                filter: 'none'
               }
             },
             '&:hover': {
-              backgroundColor: 'rgba(241, 245, 249, 0.4)'
+              backgroundColor: 'rgba(0, 0, 0, 0.04)'
             }
           }
         }}

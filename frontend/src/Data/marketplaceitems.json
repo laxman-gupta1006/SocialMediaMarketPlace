@@ -1,0 +1,22 @@
+{
+    "products": [
+      {
+        "id": 1,
+        "title": "Digital Art #1",
+        "description": "Exclusive digital artwork collection",
+        "price": "0.1 ETH",
+        "image": "https://source.unsplash.com/random/800x800/?digital-art",
+        "owner": "0x123...abc",
+        "category": "Art"
+      },
+      {
+        "id": 2,
+        "title": "AI-Generated NFT",
+        "description": "Unique AI-generated collectible",
+        "price": "0.2 ETH",
+        "image": "https://source.unsplash.com/random/800x800/?ai-art",
+        "owner": "0x456...def",
+        "category": "NFT"
+      }
+    ]
+  }
