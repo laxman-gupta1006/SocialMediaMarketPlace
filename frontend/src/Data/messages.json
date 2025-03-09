@@ -19,6 +19,16 @@
               {"type": "image", "url": "/images/mockup1.jpg"},
               {"type": "file", "name": "specs.pdf"}
             ]
+          },
+          {
+            "id": 2,
+            "text": "Here are the latest mockups",
+            "sender": "bob",
+            "timestamp": "10:30 AM",
+            "attachments": [
+              {"type": "image", "url": "/images/mockup1.jpg"},
+              {"type": "file", "name": "specs.pdf"}
+            ]
           }
         ]
       },

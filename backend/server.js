@@ -15,7 +15,7 @@ console.log(path.join(__dirname, 'certs', 'server.cert'));
 const server = https.createServer(options, (req, res) => {
     try {
       res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end('Hello, HTTPS world!\n');
+      res.end('Hello, From backend!\n');
       console.log('Response');
     } catch (err) {
       console.error('Error handling request:', err);
@@ -37,5 +37,5 @@ const PORT = 3000;
 
 // Start the server
 server.listen(PORT,IP, () => {
-  console.log(`Secure HTTPS server is running on http://${IP}:${PORT}/`);
-});
+  console.log("Secure HTTPS server is running on http://${IP}:${PORT}/");
+}); 
