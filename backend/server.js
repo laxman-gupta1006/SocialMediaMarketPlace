@@ -3,34 +3,47 @@ const https=require('https');
 const fs=require('fs');
 const path=require('path');
 const authRoutes=require('./routes/auth');
-
-// DB connection
-require('./config/dbConfig'); // Ensure dbconfig.js is in the same folder
+const cookieParser=require('cookie-parser');
+const cors=require('cors');
+require('./config/dbConfig');
 
 const app=express();
 
-// Middleware to parse JSON body (important for POST routes)
+// Logging middleware
+app.use((req,res,next)=>{
+const now=new Date().toISOString();
+console.log(`[${now}] ${req.method} ${req.originalUrl}`);
+next();
+});
+
+// Body parser & cookies
 app.use(express.json());
+app.use(cookieParser());
+
+// ✅ Updated CORS Configuration
+const allowedOrigins=['https://localhost:3001','http://192.168.2.250:3001']; // ✅ USE HTTPS frontend origin
+app.use(cors({
+  origin:function(origin,callback){
+    if(!origin||allowedOrigins.includes(origin)) callback(null,true);
+    else callback(new Error('Not allowed by CORS'));
+  },
+  credentials:true
+}));
+
 
 // Routes
 app.use('/api/auth',authRoutes);
 
-// SSL options
+// ✅ SSL Certificates
 const options={
-key:fs.readFileSync(path.join(__dirname,'certs','server.key')),
-cert:fs.readFileSync(path.join(__dirname,'certs','server.cert'))
+  key:fs.readFileSync(path.join(__dirname,'certs','server.key')),
+  cert:fs.readFileSync(path.join(__dirname,'certs','server.cert'))
 };
 
-console.log('SSL Key Path:',path.join(__dirname,'certs','server.key'));
-console.log('SSL Cert Path:',path.join(__dirname,'certs','server.cert'));
-
-// Create HTTPS server **with Express app**
 const server=https.createServer(options,app);
-
-// Server listen
 const IP='0.0.0.0';
 const PORT=3000;
 
 server.listen(PORT,IP,()=>{
-console.log(`Secure HTTPS server is running on https://${IP}:${PORT}/`);
+  console.log(`Secure HTTPS server is running on https://${IP}:${PORT}/`);
 });

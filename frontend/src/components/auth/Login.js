@@ -12,16 +12,23 @@ import {
 } from '@mui/material';
 import { Google, Group, Public } from '@mui/icons-material';
 import Logo from '../Logo';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const Login = ({ onLogin }) => {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: ''
-  });
 
-  const handleSubmit = (e) => {
+  const [formData, setFormData] = useState({ username: '', password: '' });
+  const [error, setError] = useState('');
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onLogin(formData);
+    try {
+      await login(formData);
+    } catch (err) {
+      setError(err.message || 'Login failed. Please try again.');
+    }
   };
 
   const handleGoogleLogin = () => {
@@ -128,7 +135,7 @@ const Login = ({ onLogin }) => {
             <Button 
               color="primary" 
               size="small"
-              onClick={()=>window.location.href='/signin'}
+              onClick={() => navigate('/signup')}
               sx={{ 
                 textTransform: 'none', 
                 fontWeight: 700,

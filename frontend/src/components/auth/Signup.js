@@ -10,17 +10,27 @@ import {
 } from '@mui/material';
 import { Google } from '@mui/icons-material';
 import Logo from '../Logo';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const Signup = ({ onSignup }) => {
   const [formData, setFormData] = useState({
     email: '',
     username: '',
-    password: '',
+    fullName: '',
+    password: ''
   });
+  const [error, setError] = useState('');
+  const { signup } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSignup(formData);
+    try {
+      await signup(formData);
+    } catch (err) {
+      setError(err.message || 'Signup failed. Please try again.');
+    }
   };
 
   const handleGoogleSignup = () => {
@@ -89,6 +99,16 @@ const Signup = ({ onSignup }) => {
                 />
               </Grid>
               <Grid item xs={12}>
+    <TextField
+      fullWidth
+      label="Full Name"
+      variant="outlined"
+      value={formData.fullName}
+      onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+      required
+    />
+  </Grid>
+              <Grid item xs={12}>
                 <TextField
                   fullWidth
                   label="Password"
@@ -154,7 +174,7 @@ const Signup = ({ onSignup }) => {
             <Button
               color="primary"
               size="small"
-              onClick={() => (window.location.href = '/login')}
+              onClick={() => navigate('/login')}
               sx={{
                 textTransform: 'none',
                 fontWeight: 700,

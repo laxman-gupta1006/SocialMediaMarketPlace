@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme, Box, Button,Typography } from '@mui/material';
+// App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { CssBaseline, ThemeProvider, createTheme, Box } from '@mui/material';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import MainPage from './pages/MainPage';
@@ -11,6 +12,8 @@ import MessagesPage from './pages/MessagePage';
 import SearchPage from './pages/SearchPage';
 import MarketplacePage from './pages/MarketplacePage';
 import AdminRouter from './components/AdminPanel/AdminRouter';
+import { useAuth } from './context/AuthContext';
+import Loading from './components/Loading';
 
 const theme = createTheme({
   components: {
@@ -30,14 +33,20 @@ const theme = createTheme({
   }
 });
 
+const ProtectedRoute = ({ children }) => {
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/login" replace />;
+};
+
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth();
+  return user?.role === 'admin' ? children : <Navigate to="/" replace />;
+};
+
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, loading } = useAuth();
 
-  // Temporary admin access - remove this later
-  const isAdmin = true; // Set to false to test non-admin access
-
-  const handleLogin = () => setIsAuthenticated(true);
-  const handleLogout = () => setIsAuthenticated(false);
+  if (loading) return <Loading />;
 
   return (
     <ThemeProvider theme={theme}>
@@ -46,108 +55,67 @@ const App = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        pb: '72px' // Matches navigation height
+        pb: '72px'
       }}>
-        {/* Temporary admin link - remove in production */}
-        {isAuthenticated && (
-          <Box sx={{ position: 'fixed', top: 16, right: 16, zIndex: 9999 }}>
-            <Button 
-              variant="contained" 
-              color="secondary" 
-              component={Link}
-              to="/admin"
-            >
-              Admin Panel (Dev)
-            </Button>
-          </Box>
-        )}
 
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={
-            isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
-          } />
-          <Route path="/signin" element={
-            isAuthenticated ? <Navigate to="/" /> : <Signup onSignup={handleLogin} />
-          } />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
+            <Route path="/signup" element={user ? <Navigate to="/" /> : <Signup />} />
 
-          {/* Protected User Routes */}
-          <Route path="/" element={
-            isAuthenticated ? (
-              <>
+            {/* Protected User Routes */}
+            <Route path="/" element={
+              <ProtectedRoute>
                 <MainPage />
                 <Navigation />
-              </>
-            ) : <Navigate to="/login" />
-          } />
-          
-          <Route path="/profile" element={
-            isAuthenticated ? (
-              <>
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/profile" element={
+              <ProtectedRoute>
                 <ProfilePage />
                 <Navigation />
-              </>
-            ) : <Navigate to="/login" />
-          } />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/new-post" element={
-            isAuthenticated ? (
-              <>
+            <Route path="/new-post" element={
+              <ProtectedRoute>
                 <NewPostPage />
                 <Navigation />
-              </>
-            ) : <Navigate to="/login" />
-          } />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/messages" element={
-            isAuthenticated ? (
-              <>
+            <Route path="/messages" element={
+              <ProtectedRoute>
                 <MessagesPage />
                 <Navigation />
-              </>
-            ) : <Navigate to="/login" />
-          } />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/search" element={
-            isAuthenticated ? (
-              <>
+            <Route path="/search" element={
+              <ProtectedRoute>
                 <SearchPage />
                 <Navigation />
-              </>
-            ) : <Navigate to="/login" />
-          } />
+              </ProtectedRoute>
+            } />
 
-          <Route path="/marketplace" element={
-            isAuthenticated ? (
-              <>
+            <Route path="/marketplace" element={
+              <ProtectedRoute>
                 <MarketplacePage />
                 <Navigation />
-              </>
-            ) : <Navigate to="/login" />
-          } />
+              </ProtectedRoute>
+            } />
 
-          {/* Admin Routes - Temporary access */}
-          <Route path="/admin/*" element={
-            isAuthenticated && isAdmin ? (
-              <AdminRouter />
-            ) : (
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography variant="h4">Admin Access Required</Typography>
-                <Button 
-                  variant="contained" 
-                  sx={{ mt: 2 }}
-                  component={Link}
-                  to="/"
-                >
-                  Return to Home
-                </Button>
-              </Box>
-            )
-          } />
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={
+              <AdminRoute>
+                <AdminRouter />
+              </AdminRoute>
+            } />
 
-          {/* Fallback Route */}
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+            {/* Fallback Route */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
       </Box>
     </ThemeProvider>
   );
