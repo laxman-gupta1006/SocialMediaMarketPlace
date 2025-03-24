@@ -3,6 +3,7 @@ const https=require('https');
 const fs=require('fs');
 const path=require('path');
 const authRoutes=require('./routes/auth');
+const usersRoutes=require('./routes/users')
 const cookieParser=require('cookie-parser');
 const cors=require('cors');
 require('./config/dbConfig');
@@ -21,7 +22,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // ✅ Updated CORS Configuration
-const allowedOrigins=['https://localhost:3001','http://192.168.2.250:3001']; // ✅ USE HTTPS frontend origin
+const allowedOrigins=['https://localhost:3001','https://192.168.2.250:3001','https://192.168.2.250:3002']; // ✅ USE HTTPS frontend origin
 app.use(cors({
   origin:function(origin,callback){
     if(!origin||allowedOrigins.includes(origin)) callback(null,true);
@@ -33,6 +34,7 @@ app.use(cors({
 
 // Routes
 app.use('/api/auth',authRoutes);
+app.use('/api/users',usersRoutes);
 
 // ✅ SSL Certificates
 const options={
