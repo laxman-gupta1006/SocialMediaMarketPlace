@@ -1,6 +1,13 @@
-import { Grid, Avatar, Typography, Button, Stack, Divider } from '@mui/material';
+import { Grid, Avatar, Typography, Button, Stack, Divider ,Box,CircularProgress} from '@mui/material';
 
 const ProfileHeader = ({ user, onEditClick }) => {
+  if (!user) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
   return (
     <Grid container spacing={3} alignItems="center">
       <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -13,7 +20,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
       <Grid item xs={12} md={9}>
         <Stack spacing={2}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <Typography variant="h4">{user.username}</Typography>
+            <Typography variant="h4">{user.fullName}</Typography>
             <Button 
               variant="outlined" 
               onClick={onEditClick}
@@ -30,13 +37,13 @@ const ProfileHeader = ({ user, onEditClick }) => {
           </div>
 
           <div style={{ display: 'flex', gap: 30 }}>
-            <Typography><strong>{user.postsCount}</strong> posts</Typography>
-            <Typography><strong>{user.followers}</strong> followers</Typography>
-            <Typography><strong>{user.following}</strong> following</Typography>
+        <Typography><strong>{user.postsCount}</strong> posts</Typography>
+        <Typography><strong>{user.followers}</strong> followers</Typography>
+        <Typography><strong>{user.following}</strong> following</Typography>
           </div>
 
           <div>
-            <Typography variant="subtitle1" fontWeight={600}>{user.fullName}</Typography>
+            <Typography variant="subtitle1" fontWeight={600}>{user.username}</Typography>
             <Typography variant="body2">{user.bio}</Typography>
             {user.website && (
               <Typography variant="body2" color="primary">

@@ -85,6 +85,11 @@ const Login = ({ onLogin }) => {
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.5 } }}
                 />
               </Grid>
+              {error && (
+      <Typography color="error" variant="body2" sx={{ mt: 2 }}>
+        {error}
+      </Typography>
+    )}
               <Grid item xs={12}>
                 <Button 
                   fullWidth 

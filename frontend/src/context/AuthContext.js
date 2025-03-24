@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
-const BASE_URL = 'https://192.168.2.250:3000';
+const BACKEND_URL = 'https://192.168.2.250:3000' ; 
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = async () => {
     console.debug('[checkAuth] Initiating auth check');
     try {
-      const res = await fetch(`${BASE_URL}/api/auth/me`, {
+      const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
         credentials: 'include',
       });
       console.debug('[checkAuth] Response status:', res.status);
@@ -44,38 +44,32 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (formData) => {
-    console.debug('[login] Attempting login with data:', { 
-      username: formData.username,
-      // Password intentionally omitted from logs
+// Update login function to handle immediate user state
+const login = async (formData) => {
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+      credentials: 'include'
     });
-    
-    try {
-      const res = await fetch(`${BASE_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-        credentials: 'include',
-      });
 
-      console.debug('[login] Login response status:', res.status);
-      
-      if (!res.ok) {
-        const error = await res.json();
-        console.debug('[login] Login failed with server error:', error);
-        throw new Error(error.error);
-      }
-
-      console.debug('[login] Login successful, checking auth status');
-      await checkAuth();
-      
-      console.debug('[login] Navigation to /');
-      navigate('/');
-    } catch (error) {
-      console.error('[login] Login failed:', error);
-      throw error;
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.error);
     }
-  };
+
+    // Immediately check auth status after login
+    const userRes = await fetch(`${BACKEND_URL}/api/auth/me`, {
+      credentials: 'include'
+    });
+    const userData = await userRes.json();
+    setUser(userData);
+    navigate('/');
+  } catch (error) {
+    throw error;
+  }
+};
 
   const signup = async (formData) => {
     console.debug('[signup] Attempting signup with data:', {
@@ -85,7 +79,7 @@ export const AuthProvider = ({ children }) => {
     });
 
     try {
-      const res = await fetch(`${BASE_URL}/api/auth/signup`, {
+      const res = await fetch(`${BACKEND_URL}/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -114,7 +108,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     console.debug('[logout] Initiating logout');
     try {
-      const res = await fetch(`${BASE_URL}/api/auth/logout`, {
+      const res = await fetch(`${BACKEND_URL}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });
@@ -131,7 +125,7 @@ export const AuthProvider = ({ children }) => {
   console.debug('[AuthProvider] Render state:', { user, loading });
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout ,checkAuth }}>
       {!loading ? (
         <>
           {console.debug('[AuthProvider] Rendering children')}

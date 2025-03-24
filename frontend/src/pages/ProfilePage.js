@@ -1,18 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Paper, Grid, Typography, Box } from '@mui/material';
+import { useAuth } from '../context/AuthContext';
 import EditProfileDialog from '../components/Profile/EditProfile';
 import ProfileHeader from '../components/Profile/ProfileHeader';
 import ProfilePost from '../components/Profile/ProfilePost';
-import userData from '../Data/user.json';
+
+const BACKEND_URL = 'https://192.168.2.250:3000' ; 
+
 
 const ProfilePage = () => {
-  const [user, setUser] = useState(userData.user);
+  const { user: currentUser, checkAuth } = useAuth();
+  const [posts, setPosts] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
+  const [loadingPosts, setLoadingPosts] = useState(true);
 
-  const handleSaveProfile = (updatedData) => {
-    setUser({ ...user, ...updatedData });
-    setEditOpen(false);
+  useEffect(() => {
+    const fetchPosts = async () => {
+      if (!currentUser?._id) return;
+      try {
+        setLoadingPosts(true);
+        const res = await fetch(`${BACKEND_URL}/api/posts/user/${currentUser._id}`);
+        if (!res.ok) throw new Error('Failed to fetch posts');
+        const data = await res.json();
+        setPosts(data.posts);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+      } finally {
+        setLoadingPosts(false);
+      }
+    };
+    
+    fetchPosts();
+  }, [currentUser?._id]);
+
+  const handleSaveProfile = async (updatedData) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/users/update`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(updatedData),
+      });
+  
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+  
+      await checkAuth(); // Refresh auth state
+    } catch (error) {
+      console.error('Profile update error:', error);
+      throw error;
+    } finally {
+      setEditOpen(false);
+    }
   };
+
+  if (!currentUser) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
+        <Typography>Loading profile...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{
@@ -31,8 +81,11 @@ const ProfilePage = () => {
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
         overflow: 'hidden'
       }}>
-        <ProfileHeader user={user} onEditClick={() => setEditOpen(true)} />
-        
+        <ProfileHeader 
+          user={currentUser} 
+          onEditClick={() => setEditOpen(true)} 
+        />
+
         <Typography variant="h6" sx={{ 
           mb: 3, 
           textAlign: 'center',
@@ -42,24 +95,30 @@ const ProfilePage = () => {
         }}>
           Posts
         </Typography>
-        
-        <Grid container spacing={2} justifyContent="center">
-          {user.posts?.map(post => (
-            <Grid item xs={12} sm={6} md={4} key={post.id} sx={{
-              maxWidth: '293px',
-              minWidth: '293px',
-              height: '293px',
-              position: 'relative'
-            }}>
-              <ProfilePost post={post} />
-            </Grid>
-          ))}
-        </Grid>
+
+        {loadingPosts ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography>Loading posts...</Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={2} justifyContent="center">
+            {posts.map(post => (
+              <Grid item xs={12} sm={6} md={4} key={post._id} sx={{
+                maxWidth: '293px',
+                minWidth: '293px',
+                height: '293px',
+                position: 'relative'
+              }}>
+                <ProfilePost post={post} />
+              </Grid>
+            ))}
+          </Grid>
+        )}
 
         <EditProfileDialog
           open={editOpen}
           onClose={() => setEditOpen(false)}
-          user={user}
+          user={currentUser}
           onSave={handleSaveProfile}
         />
       </Paper>

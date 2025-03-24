@@ -1,13 +1,23 @@
 import { 
     Dialog, DialogTitle, DialogContent, 
     TextField, DialogActions, Button, 
-    Stack, InputAdornment, IconButton 
+    Stack, InputAdornment, IconButton ,Typography
   } from '@mui/material';
   import { Link, Close } from '@mui/icons-material';
   import { useState } from 'react';
   
   const EditProfileDialog = ({ open, onClose, user, onSave }) => {
     const [formData, setFormData] = useState({ ...user });
+    const [error, setError] = useState(null);
+  
+    const handleSubmit = async () => {
+      try {
+        setError(null);
+        await onSave(formData);
+      } catch (error) {
+        setError(error.message || 'Failed to update profile');
+      }
+    };
   
     const handleChange = (e) => {
       setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -16,7 +26,12 @@ import {
     return (
       <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
         <DialogTitle>
-          Edit Profile
+        Edit Profile
+        {error && (
+          <Typography color="error" variant="body2" sx={{ mt: 1 }}>
+            {error}
+          </Typography>
+        )}
           <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
             <Close />
           </IconButton>
@@ -78,15 +93,15 @@ import {
         </DialogContent>
         
         <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button 
-            variant="contained" 
-            onClick={() => onSave(formData)}
-            sx={{ px: 4 }}
-          >
-            Save Changes
-          </Button>
-        </DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button 
+          variant="contained" 
+          onClick={handleSubmit}
+          sx={{ px: 4 }}
+        >
+          Save Changes
+        </Button>
+      </DialogActions>
       </Dialog>
     );
   };
