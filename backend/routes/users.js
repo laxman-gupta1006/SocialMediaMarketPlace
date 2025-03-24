@@ -58,6 +58,44 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   PUT /api/users/visibility
+// @desc    Update profile visibility
+// @access  Private
+router.put('/visibility', authMiddleware, async (req, res) => {
+  try {
+    const { profileVisibility } = req.body;
+    
+    if (!['public', 'private'].includes(profileVisibility)) {
+      return res.status(400).json({ error: 'Invalid visibility value' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { 
+        $set: { 
+          'privacySettings.profileVisibility': profileVisibility 
+        } 
+      },
+      { 
+        new: true,
+        select: '-password -__v -refreshTokens'
+      }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ 
+      message: 'Visibility updated successfully',
+      profileVisibility: user.privacySettings.profileVisibility
+    });
+  } catch (error) {
+    console.error('Visibility update error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // @route   PUT /api/users/update
 // @desc    Update user profile
 // @access  Private

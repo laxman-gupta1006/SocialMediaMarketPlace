@@ -11,6 +11,13 @@ const userSchema = new mongoose.Schema({
   following: { type: Number, default: 0 },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true }, // Hashed Password
+  privacySettings: {
+    profileVisibility: {
+      type: String,
+      enum: ['public', 'private'],
+      default: 'public'
+    }
+  }
 });
 
 // Hash password before saving
