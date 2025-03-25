@@ -1,22 +1,81 @@
+// models/Post.js
 const mongoose = require("mongoose");
 
 const postSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  username: { type: String, required: true },
-  profileImage: { type: String },
-  image: { type: String, required: true },
-  likes: { type: Number, default: 0 },
-  caption: { type: String },
-  comments: [
-    {
-      user: { type: String },
-      text: { type: String }
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "User", 
+    required: true,
+    index: true
+  },
+  image: { 
+    type: String, 
+    required: true,
+    validate: {
+      validator: v => /\.(jpe?g|png|gif|webp)$/i.test(v),
+      message: props => `${props.value} is not a valid image file!`
     }
-  ],
-  visibility: { type: String, enum: ["public", "private"], default: "public" }, // New field
-  authorizedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // Users who can view private posts
-  timestamp: { type: Date, default: Date.now }
+  },
+  caption: {
+    type: String,
+    maxlength: 2000,
+    trim: true
+  },
+  likes: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "User" 
+  }],
+  comments: [{
+    userId: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User",
+      required: true
+    },
+    text: {
+      type: String,
+      maxlength: 1000,
+      trim: true,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  visibility: { 
+    type: String, 
+    enum: ["public", "private", "followers"], 
+    default: "public"
+  },
+  authorizedUsers: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: "User",
+    index: true
+  }],
+  reports: [{
+    userId: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User",
+      required: true
+    },
+    reason: {
+      type: String,
+      enum: ['spam', 'inappropriate', 'harassment', 'other'],
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  createdAt: { 
+    type: Date, 
+    default: Date.now,
+    index: true
+  }
 });
 
-const Post = mongoose.model("Post", postSchema);
-module.exports = Post;
+// Add geospatial index for location-based queries
+postSchema.index({ location: '2dsphere' });
+
+module.exports = mongoose.model("Post", postSchema);

@@ -14,14 +14,13 @@ const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 // @access  Private
 router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
-    // Validate userId parameter
     if (!isValidObjectId(req.params.userId)) {
       return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
-    // Get user profile
     const user = await User.findById(req.params.userId)
       .select('-password -__v -refreshTokens')
+      .populate('followers following', 'username profileImage')
       .lean();
 
     if (!user) {
@@ -35,23 +34,29 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
         { visibility: 'public' },
         { 
           visibility: 'private', 
-          authorizedUsers: { $in: [req.userId] } // Using req.userId from authMiddleware
+          authorizedUsers: { $in: [req.userId] }
         }
       ]
     })
     .sort({ createdAt: -1 })
     .lean();
 
-    // Add follow status
-    const isFollowing = user.followers.includes(req.userId);
-    const profileData = {
+    // Check if current user follows this user
+    const isFollowing = user.followers.some(follower => 
+      follower._id.toString() === req.userId
+    );
+
+    res.json({
       ...user,
       postsCount: posts.length,
       isFollowing,
-      posts
-    };
-
-    res.json(profileData);
+      posts: posts.map(post => ({
+        ...post,
+        likesCount: post.likes.length,
+        commentsCount: post.comments.length,
+        hasLiked: post.likes.includes(req.userId)
+      }))
+    });
   } catch (error) {
     console.error('Error fetching user profile:', error);
     res.status(500).json({ error: 'Server error' });
@@ -71,16 +76,12 @@ router.put('/visibility', authMiddleware, async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.userId,
-      { 
-        $set: { 
-          'privacySettings.profileVisibility': profileVisibility 
-        } 
-      },
+      { 'privacySettings.profileVisibility': profileVisibility },
       { 
         new: true,
         select: '-password -__v -refreshTokens'
       }
-    );
+    ).populate('followers following', 'username profileImage');
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -116,7 +117,7 @@ router.put('/update', authMiddleware, async (req, res) => {
     // Validate username uniqueness
     if (updates.username) {
       const existingUser = await User.findOne({ username: updates.username });
-      if (existingUser && !existingUser._id.equals(req.userId)) { // Using req.userId
+      if (existingUser && !existingUser._id.equals(req.userId)) {
         return res.status(400).json({ error: 'Username already taken' });
       }
     }
@@ -124,21 +125,20 @@ router.put('/update', authMiddleware, async (req, res) => {
     // Validate email uniqueness
     if (updates.email) {
       const existingEmail = await User.findOne({ email: updates.email });
-      if (existingEmail && !existingEmail._id.equals(req.userId)) { // Using req.userId
+      if (existingEmail && !existingEmail._id.equals(req.userId)) {
         return res.status(400).json({ error: 'Email already in use' });
       }
     }
 
-    // Update user profile
     const user = await User.findByIdAndUpdate(
-      req.userId, // Using req.userId from authMiddleware
+      req.userId,
       { $set: updates },
       { 
         new: true, 
         runValidators: true,
-        select: '-password -__v -refreshTokens' 
+        select: '-password -__v -refreshTokens'
       }
-    );
+    ).populate('followers following', 'username profileImage');
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -148,7 +148,6 @@ router.put('/update', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Profile update error:', error);
     
-    // Handle specific MongoDB errors
     if (error instanceof mongoose.Error.ValidationError) {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({ error: errors.join(', ') });
@@ -158,13 +157,163 @@ router.put('/update', authMiddleware, async (req, res) => {
   }
 });
 
+// @route   GET /api/users/search
+// @desc    Global search for users by username or full name
+// @access  Private
+router.get('/search', authMiddleware, async (req, res) => {
+  try {
+    const { query } = req.query;
+    
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters' });
+    }
+
+    const currentUser = await User.findById(req.userId);
+    if (!currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const searchResults = await User.find({
+      $or: [
+        { username: { $regex: query, $options: 'i' } },
+        { fullName: { $regex: query, $options: 'i' } }
+      ],
+      _id: { $ne: req.userId },
+      $or: [
+        { 'privacySettings.profileVisibility': 'public' },
+        {
+          'privacySettings.profileVisibility': 'private',
+          _id: { $in: currentUser.following }
+        }
+      ]
+    })
+    .select('username fullName profileImage privacySettings followers following')
+    .limit(20)
+    .lean();
+
+    const resultsWithStatus = searchResults.map(user => ({
+      ...user,
+      isFollowing: currentUser.following.some(id => id.toString() === user._id.toString()),
+      followersCount: user.followers.length,
+      isPrivate: user.privacySettings?.profileVisibility === 'private'
+    }));
+
+    res.json(resultsWithStatus);
+  } catch (error) {
+    console.error('Search error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// @route   POST /api/users/follow/:userId
+// @desc    Follow a user
+// @access  Private
+router.post('/follow/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    if (userId === req.userId) {
+      return res.status(400).json({ error: 'Cannot follow yourself' });
+    }
+
+    // Add to current user's following list
+    const currentUser = await User.findByIdAndUpdate(
+      req.userId,
+      { $addToSet: { following: userId } },
+      { new: true }
+    );
+
+    // Add to target user's followers list
+    const targetUser = await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { followers: req.userId } },
+      { new: true }
+    );
+
+    res.json({
+      success: true,
+      followersCount: targetUser.followers.length,
+      isFollowing: true
+    });
+  } catch (error) {
+    console.error('Follow error:', error);
+    res.status(500).json({ error: 'Failed to follow user' });
+  }
+});
+
+// @route   POST /api/users/unfollow/:userId
+// @desc    Unfollow a user
+// @access  Private
+router.post('/unfollow/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    if (userId === req.userId) {
+      return res.status(400).json({ error: 'Cannot unfollow yourself' });
+    }
+
+    // Remove from current user's following list
+    const currentUser = await User.findByIdAndUpdate(
+      req.userId,
+      { $pull: { following: userId } },
+      { new: true }
+    );
+
+    // Remove from target user's followers list
+    const targetUser = await User.findByIdAndUpdate(
+      userId,
+      { $pull: { followers: req.userId } },
+      { new: true }
+    );
+
+    res.json({
+      success: true,
+      followersCount: targetUser.followers.length,
+      isFollowing: false
+    });
+  } catch (error) {
+    console.error('Unfollow error:', error);
+    res.status(500).json({ error: 'Failed to unfollow user' });
+  }
+});
+
+// @route   GET /api/users/follow-status/:userId
+// @desc    Check follow status between users
+// @access  Private
+router.get('/follow-status/:userId', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    const currentUser = await User.findById(req.userId);
+    const isFollowing = currentUser.following.some(id => id.toString() === userId);
+
+    res.json({ isFollowing });
+  } catch (error) {
+    console.error('Follow status error:', error);
+    res.status(500).json({ error: 'Failed to check follow status' });
+  }
+});
+
 // @route   GET /api/users/me
 // @desc    Get current user profile
 // @access  Private
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.userId) // Using req.userId
+    const user = await User.findById(req.userId)
       .select('-password -__v -refreshTokens')
+      .populate('followers following', 'username profileImage')
       .lean();
 
     if (!user) {
