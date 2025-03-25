@@ -2,9 +2,80 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const pick = require('lodash.pick');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
 const User = require('../models/User');
 const Post = require('../models/Post');
+
+// Configure multer for profile photo uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads/profiles');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Not an image! Please upload an image file.'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: fileFilter
+});
+
+// @route   POST /api/users/profile-photo
+// @desc    Upload profile photo
+// @access  Private
+router.post('/profile-photo', authMiddleware, upload.single('photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Please upload a photo.' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete old profile photo if it exists and isn't the default
+    if (user.profileImage && user.profileImage !== '/default-profile.png') {
+      const oldPhotoPath = path.join(__dirname, '..', user.profileImage);
+      if (fs.existsSync(oldPhotoPath)) {
+        fs.unlinkSync(oldPhotoPath);
+      }
+    }
+
+    // Update user's profile image path
+    const relativePhotoPath = '/uploads/profiles/' + req.file.filename;
+    user.profileImage = relativePhotoPath;
+    await user.save();
+
+    res.json({
+      message: 'Profile photo updated successfully',
+      profileImage: relativePhotoPath
+    });
+  } catch (error) {
+    console.error('Profile photo upload error:', error);
+    res.status(500).json({ error: 'Error uploading profile photo' });
+  }
+});
 
 // Helper function to validate MongoDB ID
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);

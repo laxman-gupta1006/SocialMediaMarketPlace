@@ -56,6 +56,7 @@ const fetchPosts = async () => {
 
   const handleSaveProfile = async (updatedData) => {
     try {
+      // If there's a new profile image, it's already been uploaded and the path is in updatedData
       const res = await fetch(`${BACKEND_URL}/api/users/update`, {
         method: 'PUT',
         headers: { 
@@ -70,12 +71,12 @@ const fetchPosts = async () => {
         throw new Error(errorData.error || 'Failed to update profile');
       }
   
-      await checkAuth(); // Refresh auth state
+      // Refresh auth state to get updated user data including new profile photo
+      await checkAuth();
+      setEditOpen(false);
     } catch (error) {
       console.error('Profile update error:', error);
       throw error;
-    } finally {
-      setEditOpen(false);
     }
   };
 

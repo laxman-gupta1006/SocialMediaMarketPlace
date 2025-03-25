@@ -15,6 +15,8 @@ import Settings from './Settings';
 import { useAuth } from '../../context/AuthContext'; // Import useAuth
 import { useState } from 'react';
 
+const BACKEND_URL = 'https://192.168.2.250:3000';
+
 const ProfileHeader = ({ user, onEditClick }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user: currentUser } = useAuth(); // Get current logged-in user
@@ -30,12 +32,23 @@ const ProfileHeader = ({ user, onEditClick }) => {
   // Check if the profile belongs to the current user
   const isCurrentUser = currentUser && user._id === currentUser._id;
 
+  // Construct the full profile image URL
+  const profileImageUrl = user.profileImage?.startsWith('http') 
+    ? user.profileImage 
+    : `${BACKEND_URL}${user.profileImage}`;
+
   return (
     <Grid container spacing={3} alignItems="center">
       <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'center' }}>
         <Avatar 
-          src={user.profileImage} 
-          sx={{ width: 150, height: 150, border: '3px solid white', boxShadow: 3 }}
+          src={profileImageUrl}
+          alt={user.username}
+          sx={{ 
+            width: 150, 
+            height: 150, 
+            border: '3px solid white', 
+            boxShadow: 3 
+          }}
         />
       </Grid>
       
