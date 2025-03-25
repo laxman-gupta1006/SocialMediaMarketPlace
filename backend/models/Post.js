@@ -1,4 +1,3 @@
-// models/Post.js
 const mongoose = require("mongoose");
 
 const postSchema = new mongoose.Schema({
@@ -29,6 +28,10 @@ const postSchema = new mongoose.Schema({
     userId: { 
       type: mongoose.Schema.Types.ObjectId, 
       ref: "User",
+      required: true
+    },
+    username: {  // Added username field
+      type: String,
       required: true
     },
     text: {
@@ -77,5 +80,21 @@ const postSchema = new mongoose.Schema({
 
 // Add geospatial index for location-based queries
 postSchema.index({ location: '2dsphere' });
+
+// Middleware to automatically populate username when saving comments
+postSchema.pre('save', async function(next) {
+  if (this.isModified('comments')) {
+    const User = mongoose.model('User');
+    for (const comment of this.comments) {
+      if (!comment.username && comment.userId) {
+        const user = await User.findById(comment.userId);
+        if (user) {
+          comment.username = user.username;
+        }
+      }
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model("Post", postSchema);

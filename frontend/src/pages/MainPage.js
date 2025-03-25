@@ -1,29 +1,142 @@
-import React, { useState } from 'react';
-import { Grid, Paper, Box} from '@mui/material';
-import postsData from '../Data/Post.json';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Grid, Paper, Box, CircularProgress, Typography } from '@mui/material';
 import Post from '../components/Post/Post';
+import { useAuth } from '../context/AuthContext';
 
 const MainPage = () => {
-  const [posts, setPosts] = useState(postsData.posts);
+  const { user } = useAuth();
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleLike = (postId) => {
-    setPosts(posts.map(post => 
-      post.id === postId ? { ...post, likes: post.likes + 1 } : post
-    ));
+  const fetchPosts = useCallback(async () => {
+    try {
+      const response = await fetch('https://192.168.2.250:3000/api/posts', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }, 
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch posts');
+      }
+
+      const data = await response.json();
+      setPosts(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchPosts();
+    }
+  }, [user, fetchPosts]);
+
+  const handleLike = async (postId) => {
+    try {
+      const response = await fetch(`https://192.168.2.250:3000/api/posts/like/${postId}`, {
+        method: 'PUT',
+        credentials: 'include',
+      });
+
+      if (!response.ok) throw new Error('Like update failed');
+
+      setPosts(prevPosts => prevPosts.map(post => {
+        if (post._id === postId) {
+          const hasLiked = post.likes.includes(user._id);
+          return {
+            ...post,
+            likes: hasLiked 
+              ? post.likes.filter(id => id !== user._id)
+              : [...post.likes, user._id],
+            likesCount: hasLiked ? post.likesCount - 1 : post.likesCount + 1,
+            hasLiked: !hasLiked
+          };
+        }
+        return post;
+      }));
+    } catch (error) {
+      console.error('Like error:', error);
+    }
   };
 
-  const handleComment = (postId, comment) => {
-    setPosts(posts.map(post => 
-      post.id === postId ? {
-        ...post,
-        comments: [...post.comments, {
-          id: post.comments.length + 1,
-          user: 'currentUser',
-          text: comment
-        }]
-      } : post
-    ));
+  const handleComment = async (postId, text) => {
+    try {
+      const response = await fetch(`https://192.168.2.250:3000/api/posts/comment/${postId}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) throw new Error('Comment failed');
+      
+      const newComment = await response.json();
+
+      setPosts(prevPosts => prevPosts.map(post => {
+        if (post._id === postId) {
+          return {
+            ...post,
+            comments: [...post.comments, {
+              _id: newComment._id,
+              userId: {
+                _id: user._id,
+                username: user.username,
+                profileImage: user.profileImage
+              },
+              text: text,
+              createdAt: new Date().toISOString()
+            }],
+            commentsCount: post.commentsCount + 1
+          };
+        }
+        return post;
+      }));
+    } catch (error) {
+      console.error('Comment error:', error);
+    }
   };
+
+  const handleReport = async (postId, reason) => {
+    try {
+      const response = await fetch(`https://192.168.2.250:3000/api/posts/report/${postId}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
+      });
+
+      if (!response.ok) throw new Error('Report failed');
+      alert('Post reported successfully');
+    } catch (error) {
+      console.error('Report error:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" mt={4}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box display="flex" justifyContent="center" mt={4}>
+        <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{
@@ -38,7 +151,7 @@ const MainPage = () => {
         px: { xs: 2, sm: 0 }
       }}>
         {posts.map(post => (
-          <Grid item xs={12} key={post.id}>
+          <Grid item xs={12} key={post._id}>
             <Paper elevation={0} sx={{
               borderRadius: 2,
               overflow: 'hidden',
@@ -47,9 +160,24 @@ const MainPage = () => {
               bgcolor: 'background.paper'
             }}>
               <Post 
-                post={post} 
-                onLike={handleLike} 
-                onComment={handleComment} 
+                post={{
+                  id: post._id,
+                  username: post.userId.username,
+                  profileImage: post.userId.profileImage,
+                  image: post.image,
+                  caption: post.caption,
+                  likes: post.likesCount,
+                  comments: post.comments.map(c => ({
+                    id: c._id,
+                    user: c.userId.username,
+                    text: c.text
+                  })),
+                  hasLiked: post.hasLiked,
+                  createdAt: post.createdAt
+                }}
+                onLike={handleLike}
+                onComment={handleComment}
+                onReport={handleReport}
               />
             </Paper>
           </Grid>

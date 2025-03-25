@@ -127,7 +127,7 @@ router.get('/', authMiddleware, async (req, res) => {
     // Format response
     const formattedPosts = posts.map(post => ({
       ...post,
-      image: secureUrl(post.image),
+      image: "https://192.168.2.250:3000"+post.image,
       likesCount: post.likes.length,
       commentsCount: post.comments.length,
       hasLiked: post.likes.includes(userId)
@@ -223,7 +223,7 @@ router.put('/like/:postId', authMiddleware, async (req, res) => {
   }
 });
 
-// Add comment
+
 router.post('/comment/:postId', authMiddleware, async (req, res) => {
   try {
     const { text } = req.body;
@@ -234,18 +234,23 @@ router.post('/comment/:postId', authMiddleware, async (req, res) => {
 
     if (!sanitizedText.trim()) return res.status(400).json({ error: 'Comment text required' });
 
+    // Get the current user's username
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
     const post = await Post.findByIdAndUpdate(
       req.params.postId,
       {
         $push: {
           comments: {
             userId: req.userId,
+            username: user.username, // Include username
             text: sanitizedText
           }
         }
       },
       { new: true }
-    ).populate('comments.userId', 'username profileImage');
+    );
 
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
