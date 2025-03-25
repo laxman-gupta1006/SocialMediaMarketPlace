@@ -1,6 +1,24 @@
-import { Grid, Avatar, Typography, Button, Stack, Divider ,Box,CircularProgress} from '@mui/material';
+import { 
+  Grid, 
+  Avatar, 
+  Typography, 
+  Button, 
+  Stack, 
+  Divider,
+  Box,
+  CircularProgress,
+  IconButton,
+  Dialog
+} from '@mui/material';
+import SettingsIcon from '@mui/icons-material/Settings';
+import Settings from './Settings';
+import { useAuth } from '../../context/AuthContext'; // Import useAuth
+import { useState } from 'react';
 
 const ProfileHeader = ({ user, onEditClick }) => {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { user: currentUser } = useAuth(); // Get current logged-in user
+
   if (!user) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -8,6 +26,10 @@ const ProfileHeader = ({ user, onEditClick }) => {
       </Box>
     );
   }
+
+  // Check if the profile belongs to the current user
+  const isCurrentUser = currentUser && user._id === currentUser._id;
+
   return (
     <Grid container spacing={3} alignItems="center">
       <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -21,25 +43,40 @@ const ProfileHeader = ({ user, onEditClick }) => {
         <Stack spacing={2}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <Typography variant="h4">{user.fullName}</Typography>
-            <Button 
-              variant="outlined" 
-              onClick={onEditClick}
-              sx={{ textTransform: 'none', px: 3 }}
-            >
-              Edit Profile
-            </Button>
-            <Button 
-              variant="contained" 
-              sx={{ textTransform: 'none', px: 3 }}
-            >
-              Follow
-            </Button>
+            
+            {isCurrentUser ? (
+              <>
+                <Button 
+                  variant="outlined" 
+                  onClick={onEditClick}
+                  sx={{ textTransform: 'none', px: 3 }}
+                >
+                  Edit Profile
+                </Button>
+                <IconButton 
+                  onClick={() => setSettingsOpen(true)}
+                  sx={{ ml: 1 }}
+                  aria-label="settings"
+                >
+                  <SettingsIcon />
+                </IconButton>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="contained" 
+                  sx={{ textTransform: 'none', px: 3 }}
+                >
+                  Follow
+                </Button>
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 30 }}>
-        <Typography><strong>{user.postsCount}</strong> posts</Typography>
-        <Typography><strong>{user.followers}</strong> followers</Typography>
-        <Typography><strong>{user.following}</strong> following</Typography>
+            <Typography><strong>{user.postsCount}</strong> posts</Typography>
+            <Typography><strong>{user.followers?.length || 0}</strong> followers</Typography>
+            <Typography><strong>{user.following?.length || 0}</strong> following</Typography>
           </div>
 
           <div>
@@ -59,6 +96,20 @@ const ProfileHeader = ({ user, onEditClick }) => {
       <Grid item xs={12}>
         <Divider sx={{ my: 3 }} />
       </Grid>
+
+      {/* Settings Dialog - Only relevant for current user */}
+      {isCurrentUser && (
+        <Dialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <Box sx={{ p: 3 }}>
+            <Settings />
+          </Box>
+        </Dialog>
+      )}
     </Grid>
   );
 };

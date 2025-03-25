@@ -5,39 +5,62 @@ import EditProfileDialog from '../components/Profile/EditProfile';
 import ProfileHeader from '../components/Profile/ProfileHeader';
 import ProfilePost from '../components/Profile/ProfilePost';
 
-const BACKEND_URL = 'https://192.168.2.250:3000' ; 
-
+const BACKEND_URL = 'https://192.168.2.250:3000';
 
 const ProfilePage = () => {
-  const { user: currentUser, checkAuth } = useAuth();
+  const { user: currentUser, loading: authLoading, checkAuth } = useAuth();
   const [posts, setPosts] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
   const [loadingPosts, setLoadingPosts] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      if (!currentUser?._id) return;
-      try {
-        setLoadingPosts(true);
-        const res = await fetch(`${BACKEND_URL}/api/posts/user/${currentUser._id}`);
-        if (!res.ok) throw new Error('Failed to fetch posts');
-        const data = await res.json();
-        setPosts(data.posts);
-      } catch (error) {
-        console.error('Error fetching posts:', error);
-      } finally {
-        setLoadingPosts(false);
+   // In your fetchPosts function
+const fetchPosts = async () => {
+  if (!currentUser?._id) return;
+  try {
+    setLoadingPosts(true);
+    const res = await fetch(`${BACKEND_URL}/api/posts/user/${currentUser._id}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 
+        'Content-Type': 'application/json'
       }
-    };
+    });
     
-    fetchPosts();
-  }, [currentUser?._id]);
+    if (!res.ok) {
+      const errorData = await res.json();
+      // Handle specific visibility errors
+      if (errorData.error === 'Profile is private') {
+        setError('This profile is private');
+      } else {
+        throw new Error(errorData.error || 'Failed to fetch posts');
+      }
+      return;
+    }
+    
+    const data = await res.json();
+    setPosts(data.posts);
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    setError(error.message);
+  } finally {
+    setLoadingPosts(false);
+  }
+};
+    
+    if (!authLoading && currentUser) {
+      fetchPosts();
+    }
+  }, [currentUser?._id, authLoading, checkAuth]);
 
   const handleSaveProfile = async (updatedData) => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/users/update`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json'
+        },
         credentials: 'include',
         body: JSON.stringify(updatedData),
       });
@@ -56,10 +79,26 @@ const ProfilePage = () => {
     }
   };
 
+  if (authLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
+        <Typography>Loading user data...</Typography>
+      </Box>
+    );
+  }
+
   if (!currentUser) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
-        <Typography>Loading profile...</Typography>
+        <Typography>Please login to view your profile</Typography>
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
+        <Typography color="error">{error}</Typography>
       </Box>
     );
   }
@@ -99,6 +138,10 @@ const ProfilePage = () => {
         {loadingPosts ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Typography>Loading posts...</Typography>
+          </Box>
+        ) : posts.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography>No posts yet</Typography>
           </Box>
         ) : (
           <Grid container spacing={2} justifyContent="center">
