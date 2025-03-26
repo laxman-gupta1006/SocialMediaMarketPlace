@@ -16,34 +16,48 @@ import {
 } from '@mui/material';
 import { AddPhotoAlternate, Close } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-const BACKEND_URL = 'https://192.168.2.250:3000' ; 
+
+const BACKEND_URL = 'https://192.168.2.250:3000';
+
 const NewPostPage = () => {
   const { user } = useAuth();
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [selectedMediaFile, setSelectedMediaFile] = useState(null);
   const [caption, setCaption] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [visibility, setVisibility] = useState('public');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Cleanup object URLs when component unmounts or image changes
+  // Cleanup object URLs when component unmounts
   useEffect(() => {
     return () => {
-      if (selectedImage) {
-        URL.revokeObjectURL(selectedImage);
+      if (selectedMedia) {
+        URL.revokeObjectURL(selectedMedia);
       }
     };
-  }, [selectedImage]);
+  }, [selectedMedia]);
 
-  const handleImageSelect = (e) => {
+  const handleMediaSelect = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      // Correctly create object URL
-      const objectUrl = URL.createObjectURL(file);
-      setSelectedImage(objectUrl);
-      setSelectedImageFile(file);
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.match('image.*') && !file.type.match('video.*')) {
+      setError('Please upload only images (JPEG, PNG, WEBP, GIF) or videos (MP4, MOV)');
+      return;
     }
+
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size exceeds 10MB limit');
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setSelectedMedia(objectUrl);
+    setSelectedMediaFile(file);
+    setError(''); // Clear any previous errors
   };
 
   const handlePost = async () => {
@@ -53,17 +67,13 @@ const NewPostPage = () => {
     
     try {
       const formData = new FormData();
-      formData.append('image', selectedImageFile);
+      formData.append('media', selectedMediaFile); // Changed from 'image' to 'media'
       formData.append('caption', caption);
       formData.append('visibility', visibility);
   
       const response = await fetch(`${BACKEND_URL}/api/posts`, {
         method: 'POST',
-        credentials: 'include', // Add this line
-        headers: {
-          // Remove Authorization header if backend uses cookies
-          // Keep only if backend requires both cookie and header
-        },
+        credentials: 'include',
         body: formData
       });
   
@@ -74,8 +84,8 @@ const NewPostPage = () => {
   
       setSuccess('Post created successfully!');
       // Reset form
-      setSelectedImage(null);
-      setSelectedImageFile(null);
+      setSelectedMedia(null);
+      setSelectedMediaFile(null);
       setCaption('');
       setVisibility('public');
     } catch (err) {
@@ -93,8 +103,8 @@ const NewPostPage = () => {
             <Typography variant="h6">Create New Post</Typography>
             <IconButton 
               onClick={() => {
-                setSelectedImage(null);
-                setSelectedImageFile(null);
+                setSelectedMedia(null);
+                setSelectedMediaFile(null);
               }}
               disabled={isLoading}
             >
@@ -102,7 +112,7 @@ const NewPostPage = () => {
             </IconButton>
           </div>
 
-          {!selectedImage ? (
+          {!selectedMedia ? (
             <div style={{ 
               border: '2px dashed #ccc',
               borderRadius: '8px',
@@ -115,35 +125,49 @@ const NewPostPage = () => {
               position: 'relative'
             }}>
               <input
-                accept="image/*"
+                accept="image/*,video/*"
                 style={{ display: 'none' }}
-                id="image-upload"
+                id="media-upload"
                 type="file"
-                onChange={handleImageSelect}
+                onChange={handleMediaSelect}
                 disabled={isLoading}
               />
-              <label htmlFor="image-upload">
+              <label htmlFor="media-upload">
                 <IconButton component="span" disabled={isLoading}>
                   <AddPhotoAlternate fontSize="large" />
                 </IconButton>
               </label>
-              <Typography variant="subtitle1">Upload Photo</Typography>
+              <Typography variant="subtitle1">Upload Photo or Video</Typography>
               <Typography variant="caption" color="textSecondary">
-                Supported formats: JPEG, PNG, WEBP, GIF (max 10MB)
+                Supported formats: JPEG, PNG, WEBP, GIF, MP4, MOV (max 10MB)
               </Typography>
             </div>
           ) : (
             <>
-              <img 
-                src={selectedImage} 
-                alt="Preview" 
-                style={{ 
-                  width: '100%', 
-                  height: '400px', 
-                  objectFit: 'cover', 
-                  borderRadius: '8px' 
-                }} 
-              />
+              {selectedMediaFile.type.match('video.*') ? (
+                <video 
+                  controls
+                  src={selectedMedia}
+                  style={{ 
+                    width: '100%', 
+                    height: '400px', 
+                    objectFit: 'cover', 
+                    borderRadius: '8px' 
+                  }}
+                />
+              ) : (
+                <img 
+                  src={selectedMedia} 
+                  alt="Preview" 
+                  style={{ 
+                    width: '100%', 
+                    height: '400px', 
+                    objectFit: 'cover', 
+                    borderRadius: '8px' 
+                  }} 
+                />
+              )}
+
               <TextField
                 fullWidth
                 label="Write a caption..."
@@ -173,7 +197,7 @@ const NewPostPage = () => {
                 variant="contained"
                 color="primary"
                 onClick={handlePost}
-                disabled={isLoading || !selectedImageFile}
+                disabled={isLoading || !selectedMediaFile}
                 sx={{ mt: 2 }}
               >
                 {isLoading ? <CircularProgress size={24} /> : 'Share Post'}

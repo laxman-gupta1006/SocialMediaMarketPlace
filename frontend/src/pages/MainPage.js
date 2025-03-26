@@ -153,19 +153,14 @@ const MainPage = () => {
               <Post 
                 post={{
                   id: post._id,
-                  username: post.userId.username,
-                  profileImage: post.userId.profileImage,
-                  image: post.image,
+                  userId: post.userId,
+                  username: post.username,
+                  profileImage: post.profileImage,
+                  media: post.media, // No fallback to post.image needed
+                  mediaType: post.mediaType || 'image',
                   caption: post.caption,
-                  likes: post.likesCount,
-                  comments: post.comments.map(c => ({
-                    _id: c._id,
-                    userId: c.userId,
-                    username: c.username,
-                    profileImage: c.profileImage,
-                    text: c.text,
-                    createdAt: c.createdAt
-                  })),
+                  likes: post.likes,
+                  comments: post.comments,
                   hasLiked: post.hasLiked,
                   createdAt: post.createdAt
                 }}

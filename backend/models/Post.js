@@ -7,17 +7,22 @@ const postSchema = new mongoose.Schema({
     required: true,
     index: true
   },
-  image: { 
-    type: String, 
+  media: {
+    type: String,
     required: true,
     validate: {
-      validator: v => /\.(jpe?g|png|gif|webp)$/i.test(v),
-      message: props => `${props.value} is not a valid image file!`
+      validator: v => /\.(jpe?g|png|gif|webp|mp4|mov|avi)$/i.test(v),
+      message: props => `${props.value} is not a valid media file!`
     }
+  },
+  mediaType: {
+    type: String,
+    enum: ['image', 'video'],
+    required: true
   },
   caption: {
     type: String,
-    maxlength: 2000,
+    maxlength: 2200,
     trim: true
   },
   likes: [{ 

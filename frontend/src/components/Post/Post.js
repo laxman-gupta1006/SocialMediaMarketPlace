@@ -28,6 +28,7 @@ import Avatar from '@mui/material/Avatar';
 import { Link as RouterLink } from 'react-router-dom';
 
 const Post = ({ post, onLike, onComment, onReport }) => {
+  console.log(post);
   const [commentText, setCommentText] = useState('');
   const [anchorEl, setAnchorEl] = useState(null);
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
@@ -102,16 +103,32 @@ const Post = ({ post, onLike, onComment, onReport }) => {
         </Menu>
       </Box>
 
-      <img
-        src={post.image}
-        alt={post.caption}
-        style={{
-          width: '100%',
-          height: 'auto',
-          objectFit: 'cover',
-          aspectRatio: '1/1'
-        }}
-      />
+      {post.mediaType === 'video' ? (
+        <video
+          controls
+          src={post.media}
+          style={{
+            width: '100%',
+            height: 'auto',
+            objectFit: 'cover',
+            aspectRatio: '1/1',
+            backgroundColor: '#000'
+          }}
+        >
+          Your browser does not support the video tag.
+        </video>
+      ) : (
+        <img
+          src={post.media}
+          alt={post.caption}
+          style={{
+            width: '100%',
+            height: 'auto',
+            objectFit: 'cover',
+            aspectRatio: '1/1'
+          }}
+        />
+      )}
 
       <Box sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', gap: 1.5, mb: 1 }}>
@@ -130,7 +147,7 @@ const Post = ({ post, onLike, onComment, onReport }) => {
         </Box>
 
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          {(post.likes || 0).toLocaleString()} likes
+          {post.likes.length} likes
         </Typography>
 
         <Typography variant="body2" sx={{ mb: 1 }}>

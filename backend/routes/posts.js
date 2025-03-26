@@ -33,50 +33,77 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const allowedTypes = [
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'video/mp4', 'video/quicktime', 'video/x-msvideo'
+  ];
   allowedTypes.includes(file.mimetype) ? cb(null, true) : cb(new Error('Invalid file type'), false);
 };
 
 const upload = multer({
-  storage,
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, 'uploads/posts');
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
   fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100MB limit for videos
+  }
 });
 
 // Create new post
-router.post('/', authMiddleware, upload.single('image'), async (req, res) => {
+router.post('/', authMiddleware, upload.single('media'), async (req, res) => {
   try {
     const { caption, visibility = 'public' } = req.body;
     
-    // Validate input
-    if (!req.file) return res.status(400).json({ error: 'Image is required' });
+    if (!req.file) return res.status(400).json({ error: 'Media file is required' });
 
-    // Sanitize content
+    // Determine media type
+    const mediaType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+
     const sanitizedCaption = sanitizeHtml(caption, {
       allowedTags: [],
       allowedAttributes: {}
     });
 
-    // Create post
     const newPost = new Post({
       userId: req.userId,
-      image: `/uploads/posts/${req.file.filename}`,
+      media: `/uploads/posts/${req.file.filename}`,
+      mediaType,
       caption: sanitizedCaption,
       visibility
     });
 
     await newPost.save();
 
-    res.status(201).json({
-      message: 'Post created successfully',
-      post: {
-        id: newPost._id,
-        image: newPost.image,
-        caption: newPost.caption,
-        visibility: newPost.visibility,
-        createdAt: newPost.createdAt
-      }
-    });
+    // Format response
+    const formattedPost = {
+      _id: newPost._id,
+      userId: newPost.userId._id,
+      username: newPost.userId.username,
+      profileImage: "https://192.168.2.250:3000"+newPost.userId.profileImage,
+      media: "https://192.168.2.250:3000"+newPost.media,
+      mediaType: newPost.mediaType,
+      caption: newPost.caption,
+      likes: newPost.likes,
+      comments: newPost.comments.map(comment => ({
+        _id: comment._id,
+        userId: comment.userId,
+        username: comment.username,
+        profileImage: "https://192.168.2.250:3000"+comment.profileImage,
+        text: comment.text,
+        createdAt: comment.createdAt
+      })),
+      hasLiked: false,
+      createdAt: newPost.createdAt
+    };
+
+    res.status(201).json(formattedPost);
   } catch (error) {
     console.error('Post creation error:', error);
     res.status(500).json({ error: 'Failed to create post' });
@@ -125,25 +152,31 @@ router.get('/', authMiddleware, async (req, res) => {
       .lean();
 
     // Format response
-    const formattedPosts = posts.map(post => ({
-      _id: post._id,
-      userId: post.userId._id,
-      username: post.userId.username,
-      profileImage: "https://192.168.2.250:3000"+post.userId.profileImage,
-      image: "https://192.168.2.250:3000"+post.image,
-      caption: post.caption,
-      likes: post.likes,
-      comments: post.comments.map(comment => ({
-        _id: comment._id,
-        userId: comment.userId,
-        username: comment.username,
-        profileImage: "https://192.168.2.250:3000"+comment.profileImage,
-        text: comment.text,
-        createdAt: comment.createdAt
-      })),
-      hasLiked: post.likes.includes(userId),
-      createdAt: post.createdAt
-    }));
+   // In your GET /api/posts route
+const formattedPosts = posts.map(post => ({
+  _id: post._id,
+  userId: post.userId._id,
+  username: post.userId.username,
+  profileImage: post.userId.profileImage 
+    ? "https://192.168.2.250:3000" + post.userId.profileImage 
+    : null,
+  media: "https://192.168.2.250:3000" + post.media, // Unified media field
+  mediaType: post.mediaType, // This should always be set
+  caption: post.caption,
+  likes: post.likes,
+  comments: post.comments.map(comment => ({
+    _id: comment._id,
+    userId: comment.userId,
+    username: comment.username,
+    profileImage: comment.profileImage 
+      ? "https://192.168.2.250:3000" + comment.profileImage 
+      : null,
+    text: comment.text,
+    createdAt: comment.createdAt
+  })),
+  hasLiked: post.likes.includes(userId),
+  createdAt: post.createdAt
+}));
 
     res.json(formattedPosts);
   } catch (error) {
@@ -199,7 +232,8 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
       userId: post.userId._id,
       username: post.userId.username,
       profileImage: "https://192.168.2.250:3000"+post.userId.profileImage,
-      image: "https://192.168.2.250:3000"+post.image,
+      media: post.media ? "https://192.168.2.250:3000"+post.media : "https://192.168.2.250:3000"+post.image,
+      mediaType: post.mediaType || 'image',
       caption: post.caption,
       likes: post.likes,
       comments: post.comments.map(comment => ({
@@ -222,12 +256,31 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
   }
 });
 // Like/Unlike post
+// Like/Unlike post - Updated version
 router.put('/like/:postId', authMiddleware, async (req, res) => {
   try {
-    const post = await Post.findById(req.params.postId);
-    if (!post) return res.status(404).json({ error: 'Post not found' });
+    const post = await Post.findById(req.params.postId)
+      .populate('userId', 'followers');
+    
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
 
     const userId = req.userId;
+    const isOwner = post.userId._id.equals(userId);
+    const isFollowing = post.userId.followers.includes(userId);
+
+    // Check visibility permissions
+    if (!isOwner) {
+      if (post.visibility === 'private') {
+        return res.status(403).json({ error: 'Cannot like private posts' });
+      }
+      
+      if (post.visibility === 'followers' && !isFollowing) {
+        return res.status(403).json({ error: 'Must follow user to like this post' });
+      }
+    }
+
     const likeIndex = post.likes.indexOf(userId);
 
     if (likeIndex === -1) {
@@ -237,9 +290,10 @@ router.put('/like/:postId', authMiddleware, async (req, res) => {
     }
 
     await post.save();
+    
     res.json({ 
       likesCount: post.likes.length, 
-      hasLiked: !post.likes.includes(userId)
+      hasLiked: post.likes.includes(userId)
     });
   } catch (error) {
     console.error('Like error:', error);
