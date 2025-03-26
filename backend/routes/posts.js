@@ -126,11 +126,23 @@ router.get('/', authMiddleware, async (req, res) => {
 
     // Format response
     const formattedPosts = posts.map(post => ({
-      ...post,
+      _id: post._id,
+      userId: post.userId._id,
+      username: post.userId.username,
+      profileImage: "https://192.168.2.250:3000"+post.userId.profileImage,
       image: "https://192.168.2.250:3000"+post.image,
-      likesCount: post.likes.length,
-      commentsCount: post.comments.length,
-      hasLiked: post.likes.includes(userId)
+      caption: post.caption,
+      likes: post.likes,
+      comments: post.comments.map(comment => ({
+        _id: comment._id,
+        userId: comment.userId,
+        username: comment.username,
+        profileImage: "https://192.168.2.250:3000"+comment.profileImage,
+        text: comment.text,
+        createdAt: comment.createdAt
+      })),
+      hasLiked: post.likes.includes(userId),
+      createdAt: post.createdAt
     }));
 
     res.json(formattedPosts);
@@ -183,11 +195,23 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
     console.log("I am here at 4")
     // Format response
     const formattedPosts = posts.map(post => ({
-      ...post,
+      _id: post._id,
+      userId: post.userId._id,
+      username: post.userId.username,
+      profileImage: "https://192.168.2.250:3000"+post.userId.profileImage,
       image: "https://192.168.2.250:3000"+post.image,
-      likesCount: post.likes.length,
-      commentsCount: post.comments.length,
-      hasLiked: post.likes.includes(currentUserId)
+      caption: post.caption,
+      likes: post.likes,
+      comments: post.comments.map(comment => ({
+        _id: comment._id,
+        userId: comment.userId,
+        username: comment.username,
+        profileImage: "https://192.168.2.250:3000"+comment.profileImage,
+        text: comment.text,
+        createdAt: comment.createdAt
+      })),
+      hasLiked: post.likes.includes(currentUserId),
+      createdAt: post.createdAt
     }));
     console.log(formattedPosts);
     console.log("I am here at 5")
@@ -234,8 +258,8 @@ router.post('/comment/:postId', authMiddleware, async (req, res) => {
 
     if (!sanitizedText.trim()) return res.status(400).json({ error: 'Comment text required' });
 
-    // Get the current user's username
-    const user = await User.findById(req.userId);
+    // Get the current user's info
+    const user = await User.findById(req.userId).select('username profileImage');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const post = await Post.findByIdAndUpdate(
@@ -244,8 +268,10 @@ router.post('/comment/:postId', authMiddleware, async (req, res) => {
         $push: {
           comments: {
             userId: req.userId,
-            username: user.username, // Include username
-            text: sanitizedText
+            username: user.username,
+            profileImage: "https://192.168.2.250:3000"+user.profileImage,
+            text: sanitizedText,
+            createdAt: new Date()
           }
         }
       },
@@ -254,7 +280,18 @@ router.post('/comment/:postId', authMiddleware, async (req, res) => {
 
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    res.json(post.comments);
+    // Get the newly added comment
+    const newComment = post.comments[post.comments.length - 1];
+
+    // Return the formatted comment
+    res.status(201).json({
+      _id: newComment._id,
+      userId: newComment.userId,
+      username: newComment.username,
+      profileImage: "https://192.168.2.250:3000"+newComment.profileImage,
+      text: newComment.text,
+      createdAt: newComment.createdAt
+    });
   } catch (error) {
     console.error('Comment error:', error);
     res.status(500).json({ error: 'Failed to add comment' });

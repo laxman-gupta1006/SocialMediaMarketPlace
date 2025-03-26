@@ -13,7 +13,8 @@ import {
   Button,
   Select,
   FormControl,
-  InputLabel
+  InputLabel,
+  Link
 } from '@mui/material';
 import { 
   Favorite, 
@@ -24,6 +25,7 @@ import {
   Send 
 } from '@mui/icons-material';
 import Avatar from '@mui/material/Avatar';
+import { Link as RouterLink } from 'react-router-dom';
 
 const Post = ({ post, onLike, onComment, onReport }) => {
   const [commentText, setCommentText] = useState('');
@@ -70,9 +72,21 @@ const Post = ({ post, onLike, onComment, onReport }) => {
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Avatar src={post.profileImage} sx={{ width: 32, height: 32 }} />
-          <Typography variant="subtitle2" sx={{ ml: 2, fontWeight: 600 }}>
+          <Link 
+            component={RouterLink} 
+            to={`/user/${post.userId}`}
+            sx={{ 
+              ml: 2, 
+              fontWeight: 600,
+              textDecoration: 'none',
+              color: 'inherit',
+              '&:hover': {
+                textDecoration: 'underline'
+              }
+            }}
+          >
             {post.username}
-          </Typography>
+          </Link>
         </Box>
         <IconButton onClick={handleMenuOpen}>
           <MoreVert />
@@ -116,18 +130,61 @@ const Post = ({ post, onLike, onComment, onReport }) => {
         </Box>
 
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          {post.likes.toLocaleString()} likes
+          {(post.likes || 0).toLocaleString()} likes
         </Typography>
 
         <Typography variant="body2" sx={{ mb: 1 }}>
-          <span style={{ fontWeight: 600 }}>{post.username}</span> {post.caption}
+          <Link 
+            component={RouterLink} 
+            to={`/user/${post.userId}`}
+            sx={{ 
+              fontWeight: 600,
+              textDecoration: 'none',
+              color: 'inherit',
+              '&:hover': {
+                textDecoration: 'underline'
+              }
+            }}
+          >
+            {post.username}
+          </Link> {post.caption}
         </Typography>
-
+            
         {post.comments.map(comment => (
-          <Typography key={comment.id} variant="body2" sx={{ mb: 0.5 }}>
-            <span style={{ fontWeight: 600 }}>{comment.username}</span> {comment.text}
-          </Typography>
-        ))}
+  <Box key={comment._id} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
+    <Avatar 
+      src={comment.profileImage} 
+      sx={{ width: 24, height: 24 }}
+      component={RouterLink}
+      to={`/user/${comment.userId}`}
+    />
+    <Box>
+      <Typography variant="body2">
+        <Link 
+          component={RouterLink} 
+          to={`/user/${comment.userId}`}
+          sx={{ 
+            fontWeight: 600,
+            textDecoration: 'none',
+            color: 'inherit',
+            '&:hover': { textDecoration: 'underline' }
+          }}
+        >
+          {comment.username}
+        </Link> {comment.text}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {new Date(comment.createdAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}
+      </Typography>
+    </Box>
+  </Box>
+))}
 
         <form onSubmit={handleCommentSubmit} style={{ marginTop: '1rem' }}>
           <TextField

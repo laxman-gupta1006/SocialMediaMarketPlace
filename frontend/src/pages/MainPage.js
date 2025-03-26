@@ -79,22 +79,13 @@ const MainPage = () => {
       if (!response.ok) throw new Error('Comment failed');
       
       const newComment = await response.json();
+      console.log('New comment from server:', newComment);
 
       setPosts(prevPosts => prevPosts.map(post => {
         if (post._id === postId) {
           return {
             ...post,
-            comments: [...post.comments, {
-              _id: newComment._id,
-              userId: {
-                _id: user._id,
-                username: user.username,
-                profileImage: user.profileImage
-              },
-              text: text,
-              createdAt: new Date().toISOString()
-            }],
-            commentsCount: post.commentsCount + 1
+            comments: [...post.comments, newComment]
           };
         }
         return post;
@@ -168,9 +159,12 @@ const MainPage = () => {
                   caption: post.caption,
                   likes: post.likesCount,
                   comments: post.comments.map(c => ({
-                    id: c._id,
-                    user: c.userId.username,
-                    text: c.text
+                    _id: c._id,
+                    userId: c.userId,
+                    username: c.username,
+                    profileImage: c.profileImage,
+                    text: c.text,
+                    createdAt: c.createdAt
                   })),
                   hasLiked: post.hasLiked,
                   createdAt: post.createdAt

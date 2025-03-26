@@ -30,7 +30,11 @@ const postSchema = new mongoose.Schema({
       ref: "User",
       required: true
     },
-    username: {  // Added username field
+    username: {
+      type: String,
+      required: true
+    },
+    profileImage: {
       type: String,
       required: true
     },
