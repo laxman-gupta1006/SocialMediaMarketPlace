@@ -184,75 +184,116 @@ const formattedPosts = posts.map(post => ({
     res.status(500).json({ error: 'Failed to fetch posts' });
   }
 });
-
-// Get posts by user ID with proper visibility checks
 router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
-    page = 1, limit = 10;
     const userId = req.params.userId;
     const currentUserId = req.userId;
-    console.log(userId+" "+currentUserId)
-    // Validate user ID format
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: 'Invalid user ID' });
-    }
-    console.log("I am here at 1")
-    // Check if current user follows the target user
-    const isFollowing = await User.exists({
-      _id: userId,
-      followers: currentUserId
-    });
-    console.log("I am here at 2")
-    const isOwner = currentUserId === userId;
+    const page = 1;
+    const limit = 10;
 
-    // Build post query based on relationship
+    console.log("Incoming User ID:", userId);
+    console.log("Current User ID:", currentUserId);
+
+    // Validate user ID format MORE ROBUSTLY
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    // Explicitly convert to ObjectId
+    const userObjectId = mongoose.Types.ObjectId.createFromHexString(userId);
+    const currentUserObjectId = mongoose.Types.ObjectId.createFromHexString(currentUserId);
+
+    // Find the target user first to ensure they exist
+    const targetUser = await User.findById(userObjectId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check following status
+    const isFollowing = await User.findOne({
+      _id: userObjectId,
+      followers: currentUserObjectId
+    });
+
+    const isOwner = userObjectId.equals(currentUserObjectId);
+
+    // Construct query with explicit ObjectId comparison
     const postQuery = {
-      userId: userId,
+      userId: userObjectId,
       $or: [
         { visibility: 'public' },
         ...(isOwner ? [{ visibility: 'private' }] : []),
         ...(isOwner || isFollowing ? [{ visibility: 'followers' }] : []),
         { 
           visibility: 'private',
-          authorizedUsers: { $in: [currentUserId] }
+          authorizedUsers: { $in: [currentUserObjectId] }
         }
       ]
     };
-    console.log("I am here at 3")
+
+    console.log("Post Query:", JSON.stringify(postQuery, null, 2));
+
     const posts = await Post.find(postQuery)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
-      .populate('userId', 'username profileImage')
+      .populate({
+        path: 'userId',
+        select: 'username profileImage'
+      })
       .lean();
-    console.log("I am here at 4")
-    // Format response
-    const formattedPosts = posts.map(post => ({
-      _id: post._id,
-      userId: post.userId._id,
-      username: post.userId.username,
-      profileImage: "https://192.168.2.250:3000"+post.userId.profileImage,
-      media: post.media ? "https://192.168.2.250:3000"+post.media : "https://192.168.2.250:3000"+post.image,
-      mediaType: post.mediaType || 'image',
-      caption: post.caption,
-      likes: post.likes,
-      comments: post.comments.map(comment => ({
-        _id: comment._id,
-        userId: comment.userId,
-        username: comment.username,
-        profileImage: "https://192.168.2.250:3000"+comment.profileImage,
-        text: comment.text,
-        createdAt: comment.createdAt
-      })),
-      hasLiked: post.likes.includes(currentUserId),
-      createdAt: post.createdAt
-    }));
-    console.log(formattedPosts);
-    console.log("I am here at 5")
-    res.json({ posts: formattedPosts });
+
+    console.log("Found Posts:", posts.length);
+
+    // Robust formatting with extensive error handling
+    const formattedPosts = posts.map(post => {
+      try {
+        return {
+          _id: post._id ? post._id.toString() : null,
+          userId: post.userId?._id ? post.userId._id.toString() : null,
+          username: post.userId?.username || 'Unknown User',
+          profileImage: post.userId?.profileImage 
+            ? `https://192.168.2.250:3000${post.userId.profileImage}` 
+            : '/default-profile.png',
+          media: post.media 
+            ? `https://192.168.2.250:3000${post.media}` 
+            : '/default-media.png',
+          mediaType: post.mediaType || 'image',
+          caption: post.caption || '',
+          likes: post.likes || [],
+          comments: (post.comments || []).map(comment => ({
+            _id: comment._id ? comment._id.toString() : null,
+            userId: comment.userId ? comment.userId.toString() : null,
+            username: comment.username || 'Unknown User',
+            profileImage: comment.profileImage 
+              ? `https://192.168.2.250:3000${comment.profileImage}` 
+              : '/default-profile.png',
+            text: comment.text || '',
+            createdAt: comment.createdAt
+          })),
+          hasLiked: (post.likes || []).some(like => 
+            mongoose.Types.ObjectId(like).equals(currentUserObjectId)
+          ),
+          createdAt: post.createdAt
+        };
+      } catch (formatError) {
+        console.error('Post formatting error:', formatError);
+        return null;
+      }
+    }).filter(post => post !== null);
+
+    res.json({ 
+      posts: formattedPosts,
+      total: formattedPosts.length
+    });
+
   } catch (error) {
-    console.error('Get user posts error:', error);
-    res.status(500).json({ error: 'Failed to fetch user posts' });
+    console.error('Get user posts FULL error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch user posts', 
+      details: error.message,
+      stack: error.stack
+    });
   }
 });
 // Like/Unlike post
