@@ -23,7 +23,9 @@ const userSchema = new mongoose.Schema({
   },
   profileImage: { 
     type: String,
-    default: '/default-profile.png'
+    default: function() {
+      return `https://api.dicebear.com/7.x/avataaars/svg?seed=${this.username}`;
+    }
   },
   email: { 
     type: String, 
@@ -34,16 +36,45 @@ const userSchema = new mongoose.Schema({
   },
   password: { 
     type: String, 
-    required: true 
+    required: true,
+    minlength: 6
   },
   followers: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    username: {
+      type: String,
+      required: true
+    },
+    profileImage: {
+      type: String,
+      required: true
+    }
   }],
   following: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    username: {
+      type: String,
+      required: true
+    },
+    profileImage: {
+      type: String,
+      required: true
+    }
   }],
+  phoneNumber: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
   postsCount: { 
     type: Number, 
     default: 0 
