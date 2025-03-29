@@ -15,7 +15,7 @@ const MessageInput = ({ value, onChange, onSend }) => (
     <TextField
       fullWidth
       variant="outlined"
-      placeholder="Type a message..."
+      placeholder="Type a message to start chat..."
       value={value}
       onChange={onChange}
       InputProps={{

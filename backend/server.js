@@ -10,6 +10,11 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 require('./config/dbConfig');
 
+
+const messagesRoutes = require('./routes/messages'); // Import messages routes [for routing messages added by deepankar]
+
+
+
 const app = express();
 
 // 1. Logging middleware
@@ -68,6 +73,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
+
+// for routing messages added by deepankar
+app.use('/api/messages', messagesRoutes); // Register messages API
 
 // 6. Error handling middleware
 app.use((err, req, res, next) => {
