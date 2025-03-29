@@ -92,7 +92,7 @@ const sslOptions = {
 // 8. HTTPS Server
 const server = https.createServer(sslOptions, app);
 const PORT = 3000;
-const HOST = '192.168.2.250'; // Using your specific IP
+const HOST = 'localhost'; // Using your specific IP
 
 server.listen(PORT, HOST, () => {
   console.log(`Secure server running on https://${HOST}:${PORT}`);
