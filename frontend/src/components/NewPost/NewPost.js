@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Box, Typography, Button, TextField } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import config from '../../Config/config';
 
+const BACKEND_URL = config.BACKEND_URL;
 const NewPost = () => {
   const navigate = useNavigate();
   const [selectedMediaFile, setSelectedMediaFile] = useState(null);
@@ -28,7 +30,7 @@ const NewPost = () => {
       formData.append('media', selectedMediaFile);
       formData.append('caption', caption);
 
-      const response = await fetch('https://192.168.2.250:3000/api/posts', {
+      const response = await fetch(`${BACKEND_URL}/api/posts`, {
         method: 'POST',
         credentials: 'include',
         body: formData

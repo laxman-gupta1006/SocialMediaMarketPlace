@@ -276,39 +276,45 @@ router.get('/search', authMiddleware, async (req, res) => {
   }
 });
 
-// @route   POST /api/users/follow/:userId
-// @desc    Follow a user
-// @access  Private
+// Updated follow route
 router.post('/follow/:userId', authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const targetUser = await User.findById(req.params.userId);
+    const currentUser = await User.findById(req.userId);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Add to current user's following
+    await User.findByIdAndUpdate(req.userId, {
+      $addToSet: {
+        following: {
+          userId: targetUser._id,
+          username: targetUser.username,
+          profileImage: targetUser.profileImage
+        }
+      }
+    });
+
+    // Add to target user's followers
+    await User.findByIdAndUpdate(targetUser._id, {
+      $addToSet: {
+        followers: {
+          userId: currentUser._id,
+          username: currentUser.username,
+          profileImage: currentUser.profileImage
+        }
+      }
+    });
+
+    const updatedUser = await User.findById(targetUser._id);
     
-    if (!isValidObjectId(userId)) {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
-
-    if (userId === req.userId) {
-      return res.status(400).json({ error: 'Cannot follow yourself' });
-    }
-
-    // Add to current user's following list
-    const currentUser = await User.findByIdAndUpdate(
-      req.userId,
-      { $addToSet: { following: userId } },
-      { new: true }
-    );
-
-    // Add to target user's followers list
-    const targetUser = await User.findByIdAndUpdate(
-      userId,
-      { $addToSet: { followers: req.userId } },
-      { new: true }
-    );
-
     res.json({
       success: true,
-      followersCount: targetUser.followers.length,
-      isFollowing: true
+      followersCount: updatedUser.followers.length,
+      isFollowing: true,
+      followers: updatedUser.followers
     });
   } catch (error) {
     console.error('Follow error:', error);
@@ -316,39 +322,33 @@ router.post('/follow/:userId', authMiddleware, async (req, res) => {
   }
 });
 
-// @route   POST /api/users/unfollow/:userId
-// @desc    Unfollow a user
-// @access  Private
+// Updated unfollow route
 router.post('/unfollow/:userId', authMiddleware, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const targetUser = await User.findById(req.params.userId);
+    const currentUser = await User.findById(req.userId);
+
+    if (!targetUser || !currentUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Remove from current user's following
+    await User.findByIdAndUpdate(req.userId, {
+      $pull: { following: { userId: targetUser._id } }
+    });
+
+    // Remove from target user's followers
+    await User.findByIdAndUpdate(targetUser._id, {
+      $pull: { followers: { userId: currentUser._id } }
+    });
+
+    const updatedUser = await User.findById(targetUser._id);
     
-    if (!isValidObjectId(userId)) {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
-
-    if (userId === req.userId) {
-      return res.status(400).json({ error: 'Cannot unfollow yourself' });
-    }
-
-    // Remove from current user's following list
-    const currentUser = await User.findByIdAndUpdate(
-      req.userId,
-      { $pull: { following: userId } },
-      { new: true }
-    );
-
-    // Remove from target user's followers list
-    const targetUser = await User.findByIdAndUpdate(
-      userId,
-      { $pull: { followers: req.userId } },
-      { new: true }
-    );
-
     res.json({
       success: true,
-      followersCount: targetUser.followers.length,
-      isFollowing: false
+      followersCount: updatedUser.followers.length,
+      isFollowing: false,
+      followers: updatedUser.followers
     });
   } catch (error) {
     console.error('Unfollow error:', error);

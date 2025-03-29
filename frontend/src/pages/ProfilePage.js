@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import EditProfileDialog from '../components/Profile/EditProfile';
 import ProfileHeader from '../components/Profile/ProfileHeader';
 import ProfilePost from '../components/Profile/ProfilePost';
+import config from '../Config/config';
 
-const BACKEND_URL = 'https://192.168.2.250:3000';
+const BACKEND_URL = config.BACKEND_URL;
 
 const ProfilePage = () => {
   const { user: currentUser, loading: authLoading, checkAuth } = useAuth();

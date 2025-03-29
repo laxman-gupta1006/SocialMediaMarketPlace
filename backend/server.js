@@ -5,6 +5,7 @@ const path = require('path');
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
+const marketplaceRoutes = require('./routes/marketplace');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 require('./config/dbConfig');
@@ -66,6 +67,7 @@ app.use('/uploads', express.static(uploadsDir, {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/posts', postsRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
 
 // 6. Error handling middleware
 app.use((err, req, res, next) => {

@@ -12,8 +12,9 @@ import {
 } from '@mui/material';
 import { Search, PersonAdd, Check, Lock } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import config from '../Config/config';
 
-const BACKEND_URL = 'https://192.168.2.250:3000';
+const BACKEND_URL = config.BACKEND_URL;
 
 const SearchPage = () => {
   const [searchQuery, setSearchQuery] = useState('');

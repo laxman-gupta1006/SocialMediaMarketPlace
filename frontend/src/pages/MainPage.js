@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Grid, Paper, Box, CircularProgress, Typography } from '@mui/material';
 import Post from '../components/Post/Post';
 import { useAuth } from '../context/AuthContext';
+import config from '../Config/config';
+
+const BACKEND_URL = config.BACKEND_URL;
 
 const MainPage = () => {
   const { user } = useAuth();
@@ -11,7 +14,7 @@ const MainPage = () => {
 
   const fetchPosts = useCallback(async () => {
     try {
-      const response = await fetch('https://192.168.2.250:3000/api/posts', {
+      const response = await fetch(`${BACKEND_URL}/api/posts`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -39,7 +42,7 @@ const MainPage = () => {
 
   const handleLike = async (postId) => {
     try {
-      const response = await fetch(`https://192.168.2.250:3000/api/posts/like/${postId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/posts/like/${postId}`, {
         method: 'PUT',
         credentials: 'include',
       });
@@ -67,7 +70,7 @@ const MainPage = () => {
 
   const handleComment = async (postId, text) => {
     try {
-      const response = await fetch(`https://192.168.2.250:3000/api/posts/comment/${postId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/posts/comment/${postId}`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -97,7 +100,7 @@ const MainPage = () => {
 
   const handleReport = async (postId, reason) => {
     try {
-      const response = await fetch(`https://192.168.2.250:3000/api/posts/report/${postId}`, {
+      const response = await fetch(`${BACKEND_URL}/api/posts/report/${postId}`, {
         method: 'POST',
         credentials: 'include',
         headers: {

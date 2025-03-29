@@ -2,8 +2,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import config from '../Config/config';
+
+const BACKEND_URL = config.BACKEND_URL;
 const AuthContext = createContext();
-const BACKEND_URL = 'https://192.168.2.250:3000' ; 
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
