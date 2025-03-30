@@ -5,10 +5,7 @@ const User = require('../models/User');
 const Chat = require('../models/Chat');
 const Message = require('../models/Message');
 
-
-// @route   GET /api/messages/user-info
-// @desc    Get authenticated user's ID and username
-// @access  Private
+// ✅ Get authenticated user's ID and username
 router.get('/user-info', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select('username');
@@ -24,7 +21,7 @@ router.get('/user-info', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ FIXED: Add `/my-following` route
+// ✅ Get list of users the authenticated user follows
 router.get('/my-following', authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId).lean();
@@ -40,22 +37,27 @@ router.get('/my-following', authMiddleware, async (req, res) => {
   }
 });
 
-// 📌 Get chat names and participant usernames for the authenticated user
+// ✅ Get chat list with participant names (excluding self)
 router.get('/my-chats', authMiddleware, async (req, res) => {
   try {
-    const userId = req.userId; // Authenticated user's ID
+    console.log('🔹 Fetching chats for user:', req.userId);
 
-    // Find chats where the user's ID exists in the participants array
-    const chats = await Chat.find({ participants: userId }).select('name participants').lean();
+    const userId = req.userId;
+    const chats = await Chat.find({ participants: userId }).select('participants').lean();
 
     if (!chats.length) {
+      console.log('❌ No chats found for user:', userId);
       return res.status(404).json({ error: 'No matching chats found' });
     }
 
-    // Extract unique participant IDs excluding the authenticated user
+    console.log('✅ Found chats:', chats);
+
+    // Extract participant IDs excluding the authenticated user
     const participantIds = chats.flatMap(chat => 
       chat.participants.filter(id => id.toString() !== userId)
     );
+
+    console.log('📝 Other participants:', participantIds);
 
     // Fetch user details for the participants
     const users = await User.find({ _id: { $in: participantIds } }).select('username').lean();
@@ -66,26 +68,89 @@ router.get('/my-chats', authMiddleware, async (req, res) => {
       return acc;
     }, {});
 
+    console.log('📌 User mapping:', userMap);
+
     // Format the final response
     const chatData = chats.map(chat => ({
-      chatName: chat.name,
-      participants: chat.participants
+      chatId: chat._id,
+      participant: chat.participants
         .filter(id => id.toString() !== userId)
         .map(id => ({
           userId: id,
           username: userMap[id.toString()] || 'Unknown User'
-        }))
+        }))[0] // Get the first participant (other than self)
     }));
+
+    console.log('📨 Final chat data:', chatData);
 
     res.json({ chats: chatData });
   } catch (error) {
-    console.error('Error fetching user chats:', error);
+    console.error('❌ Error fetching user chats:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 
+// ✅ Get chat ID between two users
+router.get('/get-chat-id', authMiddleware, async (req, res) => {
+  try {
+    const { user1, user2 } = req.query;
 
+    const chat = await Chat.findOne({
+      participants: { $all: [user1, user2] }
+    });
 
-// ✅ FIXED: Ensure `module.exports = router`
+    if (!chat) {
+      return res.status(404).json({ error: "Chat not found" });
+    }
+
+    res.json({ chatId: chat._id });
+  } catch (error) {
+    console.error("Error fetching chat ID:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ Get messages for a specific chat ID
+router.get('/get-messages', authMiddleware, async (req, res) => {
+  try {
+    const { chatId } = req.query;
+
+    const messages = await Message.find({ chatId }).sort({ timestamp: 1 });
+
+    res.json({ messages });
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ Send a new message
+router.post('/send-message', authMiddleware, async (req, res) => {
+  try {
+    const { chatId, text, attachments } = req.body;
+    const sender = req.userId;
+
+    if (!chatId || !text) {
+      return res.status(400).json({ error: "Chat ID and text are required" });
+    }
+
+    const newMessage = new Message({
+      chatId,
+      sender,
+      text,
+      attachments: attachments || [],
+      timestamp: new Date(),
+    });
+
+    await newMessage.save();
+
+    res.status(201).json({ message: "Message sent successfully", newMessage });
+  } catch (error) {
+    console.error("Error sending message:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ Export the router
 module.exports = router;
