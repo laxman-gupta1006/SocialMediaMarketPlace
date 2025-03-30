@@ -4,43 +4,48 @@ import ConversationList from '../components/messages/CoversationList';
 import ChatHeader from '../components/messages/ChatHeader';
 import MessageBubble from '../components/messages/MessageBubble';
 import MessageInput from '../components/messages/MessageInput';
-import messagesData from '../Data/messages.json';
+
 
 const MessagesPage = () => {
   const [selected, setSelected] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState([]);
-  const [following, setFollowing] = useState([]);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    fetch('https://localhost:3000/api/messages/my-following', {
+    fetch('https://localhost:3000/api/messages/my-chats', {
       credentials: 'include'
     })
       .then((res) => res.json())
       .then((data) => {
-        console.log('Fetched following users:', data);
+        console.log('Fetched chats:', data);
         
-        if (!data.following || !Array.isArray(data.following)) {
-          console.error('Invalid following list format:', data);
+        if (!data.chats || !Array.isArray(data.chats)) {
+          console.error('Invalid chat list format:', data);
           return;
         }
 
-        setFollowing(data.following);
-        
-        // Create conversations dynamically from the following list
-        const updatedConversations = data.following.map((user, index) => ({
-          id: index + 1,
-          name: user.username,
-          avatar: user.profileImage,
-          isGroup: false,
-          participants: [{ id: user.userId, name: user.username, avatar: user.profileImage, online: user.online }],
-          messages: []
-        }));
-        
+        // Format conversations to match UI structure
+        const updatedConversations = data.chats.map((chat, index) => {
+          const firstParticipant = chat.participants[0]; // Get first participant
+          
+          return {
+            id: index + 1, // Assign a local ID
+            name: firstParticipant?.username || "Unknown User", // Use first participant's name
+            isGroup: chat.participants.length > 1, // Determine if it's a group chat
+            participants: chat.participants.map(participant => ({
+              id: participant.userId,
+              name: participant.username,
+              avatar: '', // You can fetch avatars if available in DB
+              online: false // Handle real-time status if needed
+            })),
+            messages: [] // Placeholder for messages (can be populated later)
+          };
+        });
+
         setConversations(updatedConversations);
       })
-      .catch((err) => console.error('Error fetching following list:', err));
+      .catch((err) => console.error('Error fetching chats:', err));
   }, []);
 
   const handleSend = () => {
