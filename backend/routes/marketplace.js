@@ -6,7 +6,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const Product = require('../models/Product'); // Critical import
-
+const Purchase=require('../models/Purchase');
 // Configure secure file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -211,6 +211,42 @@ const processedProducts = products.map(product => ({
       error: 'Failed to perform search. Please try again later.',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+});
+
+
+router.post('/purchase/:productId', auth, async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.productId);
+    
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    if (product.status !== 'active') {
+      return res.status(400).json({ error: 'Product is no longer available' });
+    }
+
+    // Create purchase record
+    const purchase = new Purchase({
+      user: req.userId,
+      product: product._id,
+      paymentMethod: req.body.method,
+      paymentDetails: req.body.details,
+      amount: product.price,
+      status: 'completed' // Auto-approve for demo
+    });
+
+    await purchase.save();
+
+    // Update product status
+    product.status = 'sold';
+    await product.save();
+
+    res.json({ message: 'Purchase completed successfully' });
+  } catch (error) {
+    console.error('Purchase error:', error);
+    res.status(500).json({ error: 'Failed to process payment' });
   }
 });
 
