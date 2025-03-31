@@ -1,98 +1,157 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const authMiddleware = require('../middleware/auth');
-const User = require('../models/User');
-const Chat = require('../models/Chat');
-const Message = require('../models/Message');
+const multer = require("multer");
+const { v4: uuidv4 } = require("uuid");
+const path = require("path");
+const authMiddleware = require("../middleware/auth");
+const User = require("../models/User");
+const Chat = require("../models/Chat");
+const Message = require("../models/Message");
+const mongoose = require("mongoose"); // Ensure mongoose is imported
+
+// ✅ Configure multer for image uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/posts/"); // Save files to this directory
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const fileName = uuidv4() + ext; // Rename file with UUID
+    cb(null, fileName);
+  }
+});
+
+// ✅ File filter to allow only images
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only image files are allowed!"), false);
+  }
+};
+
+const upload = multer({ storage, fileFilter });
 
 // ✅ Get authenticated user's ID and username
-router.get('/user-info', authMiddleware, async (req, res) => {
+router.get("/user-info", authMiddleware, async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('username');
+    const user = await User.findById(req.userId).select("username");
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
     res.json({ userId: req.userId, username: user.username });
   } catch (error) {
-    console.error('Error fetching user info:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error("Error fetching user info:", error);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 // ✅ Get list of users the authenticated user follows
-router.get('/my-following', authMiddleware, async (req, res) => {
+router.get("/my-following", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId).lean();
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
     res.json({ following: user.following });
   } catch (error) {
-    console.error('Error fetching following list:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Error fetching following list:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 // ✅ Get chat list with participant names (excluding self)
-router.get('/my-chats', authMiddleware, async (req, res) => {
+// ✅ Get chat list with participant names (excluding self)
+router.get("/my-chats", authMiddleware, async (req, res) => {
   try {
-    console.log('🔹 Fetching chats for user:', req.userId);
+    const userId = req.userId; // Authenticated user's ID
+    console.log("🟢 Logged-in User ID:", userId);
 
-    const userId = req.userId;
-    const chats = await Chat.find({ participants: userId }).select('participants').lean();
+    // Fetch all chats where the user is a participant
+    const chats = await Chat.find({ participants: userId })
+      .select("participants name isGroup")
+      .lean();
+
+    console.log("📌 Retrieved Chats:", chats);
 
     if (!chats.length) {
-      console.log('❌ No chats found for user:', userId);
-      return res.status(404).json({ error: 'No matching chats found' });
+      return res.status(200).json({ chats: [] }); // No chats found
     }
 
-    console.log('✅ Found chats:', chats);
+    // Get unique participant IDs (excluding the user itself)
+    const allParticipantIds = [...new Set(chats.flatMap(chat => chat.participants))];
 
-    // Extract participant IDs excluding the authenticated user
-    const participantIds = chats.flatMap(chat => 
-      chat.participants.filter(id => id.toString() !== userId)
-    );
+    console.log("🔍 Fetching user data for participant IDs:", allParticipantIds);
 
-    console.log('📝 Other participants:', participantIds);
+    // Fetch usernames and profile images for all participants
+    const users = await User.find({ _id: { $in: allParticipantIds } })
+      .select("_id username profileImage")
+      .lean();
 
-    // Fetch user details for the participants
-    const users = await User.find({ _id: { $in: participantIds } }).select('username').lean();
+    console.log("✅ Retrieved User Data:", users);
 
-    // Convert users to a lookup map for quick access
-    const userMap = users.reduce((acc, user) => {
-      acc[user._id.toString()] = user.username;
-      return acc;
-    }, {});
+    // Create a user lookup map
+    const userMap = {};
+    users.forEach(user => {
+      userMap[user._id.toString()] = user;
+    });
 
-    console.log('📌 User mapping:', userMap);
+    console.log("🗺️ User Mapping:", userMap);
 
-    // Format the final response
-    const chatData = chats.map(chat => ({
-      chatId: chat._id,
-      participant: chat.participants
-        .filter(id => id.toString() !== userId)
-        .map(id => ({
-          userId: id,
-          username: userMap[id.toString()] || 'Unknown User'
-        }))[0] // Get the first participant (other than self)
-    }));
+    // Constructing chat data
+    const chatData = chats.map(chat => {
+      console.log(`🔄 Processing Chat: ${chat._id}`);
+      console.log("👥 Participants:", chat.participants);
 
-    console.log('📨 Final chat data:', chatData);
+      // Identify the other participant by excluding the logged-in user
+      const otherParticipantId = chat.participants.find(id => id.toString() !== userId);
+
+      console.log("🆚 Other Participant ID:", otherParticipantId);
+
+      // Get the other participant's details
+      const otherParticipant = userMap[otherParticipantId?.toString()];
+
+      console.log("🆚 Selected Other Participant:", otherParticipant);
+
+      return {
+        chatId: chat._id,
+        name: chat.isGroup
+          ? chat.name
+          : (otherParticipant?.username || "Unknown User"),
+        avatar: chat.isGroup
+          ? ""
+          : (otherParticipant?.profileImage || "/default-profile.png"),
+        isGroup: chat.isGroup,
+        participants: chat.participants.map(id => ({
+          userId: id.toString(),
+          username: userMap[id.toString()]?.username || "Unknown User",
+          profileImage: userMap[id.toString()]?.profileImage || "/default-profile.png",
+        }))
+      };
+    });
+
+    console.log("✅ Final Chat Data:", chatData);
 
     res.json({ chats: chatData });
   } catch (error) {
-    console.error('❌ Error fetching user chats:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("❌ Error fetching user chats:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
 
+
+
+
+
+
 // ✅ Get chat ID between two users
-router.get('/get-chat-id', authMiddleware, async (req, res) => {
+router.get("/get-chat-id", authMiddleware, async (req, res) => {
   try {
     const { user1, user2 } = req.query;
 
@@ -112,7 +171,7 @@ router.get('/get-chat-id', authMiddleware, async (req, res) => {
 });
 
 // ✅ Get messages for a specific chat ID
-router.get('/get-messages', authMiddleware, async (req, res) => {
+router.get("/get-messages", authMiddleware, async (req, res) => {
   try {
     const { chatId } = req.query;
 
@@ -125,32 +184,44 @@ router.get('/get-messages', authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Send a new message
-router.post('/send-message', authMiddleware, async (req, res) => {
+// ✅ Send a new message (Supports text & image uploads)
+router.post("/send-message", authMiddleware, upload.single("image"), async (req, res) => {
   try {
-    const { chatId, text, attachments } = req.body;
+    console.log("Received message data:", req.body); // 🔍 Debug log
+
+    const { chatId, text, type } = req.body;  // Extract `type`
     const sender = req.userId;
 
-    if (!chatId || !text) {
-      return res.status(400).json({ error: "Chat ID and text are required" });
+    if (!chatId) {
+      return res.status(400).json({ error: "Chat ID is required" });
     }
 
-    const newMessage = new Message({
+    let messageData = {
       chatId,
       sender,
-      text,
-      attachments: attachments || [],
       timestamp: new Date(),
-    });
+      type,  // ✅ Ensure type is included
+    };
 
-    await newMessage.save();
+    if (req.file) {
+      messageData.text = `/uploads/posts/${req.file.filename}`;
+      messageData.type = "picture"; // ✅ Override type for images
+    } else {
+      if (!text) {
+        return res.status(400).json({ error: "Text message cannot be empty." });
+      }
+      messageData.text = text;
+    }
 
-    res.status(201).json({ message: "Message sent successfully", newMessage });
+    const newMessage = await Message.create(messageData);
+    res.status(201).json({ success: true, newMessage });
+
   } catch (error) {
     console.error("Error sending message:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // ✅ Export the router
 module.exports = router;

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Grid, Box, Typography } from '@mui/material';
+import { Grid, Box, Typography, IconButton } from '@mui/material';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ConversationList from '../components/messages/CoversationList';
 import ChatHeader from '../components/messages/ChatHeader';
 import MessageBubble from '../components/messages/MessageBubble';
@@ -9,107 +10,144 @@ const MessagesPage = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(null);  // ✅ Store logged-in user ID
+  const [currentUserId, setCurrentUserId] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // ✅ Fetch logged-in user ID when component mounts
   useEffect(() => {
-    fetch('https://localhost:3000/api/auth/me', { credentials: 'include' }) 
+    fetch('https://localhost:3000/api/auth/me', { credentials: 'include' })
       .then(res => res.json())
-      .then(data => {
-        console.log("User API Response:", data);  
-        setCurrentUserId(data._id);  // ✅ Use `_id` from response
-      })
+      .then(data => setCurrentUserId(data._id))
       .catch(err => console.error('Error fetching user ID:', err));
   }, []);
-  
 
   useEffect(() => {
-    console.log("Fetching chats...");
+    if (!currentUserId) return;  // 🛑 Prevent running if currentUserId is not available
+  
     fetch('https://localhost:3000/api/messages/my-chats', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include'
     })
-    .then(response => {
-      if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-      return response.json();
-    })
+    .then(response => response.json())
     .then(data => {
-      console.log('Fetched chats:', data);
-      if (!data.chats || !Array.isArray(data.chats)) {
-        console.error('Invalid chats format:', data);
-        return;
+      console.log("✅ API Response:", data);
+  
+      if (Array.isArray(data.chats)) {
+        const updatedConversations = data.chats.map(chat => {
+          console.log("📌 Chat Data Before Processing:", chat);
+  
+          // 🛑 Make sure participants exist and currentUserId is defined
+          if (!chat.participants || !Array.isArray(chat.participants)) {
+            console.error("⚠️ No participants found for chat:", chat);
+            return null;
+          }
+  
+          // 🔍 Find the other participant (not the logged-in user)
+          const otherParticipant = chat.participants.find(p => p.userId !== currentUserId);
+          
+          if (!otherParticipant) {
+            console.error("❌ No other participant found in chat:", chat);
+            return null;
+          }
+  
+          console.log("🟢 Selected Other Participant:", otherParticipant);
+  
+          return {
+            id: chat.chatId || chat._id,
+            chatId: chat.chatId || chat._id,
+            name: otherParticipant.username || 'Unknown User',
+            avatar: otherParticipant.profileImage || '/default-profile.png',
+            participant: otherParticipant
+          };
+        }).filter(Boolean); // 🧹 Remove `null` values
+  
+        console.log("📝 Final Conversations:", updatedConversations);
+  
+        setConversations(updatedConversations);
       }
-      setConversations(data.chats.map(chat => ({
-        id: chat.chatId || chat._id,
-        chatId: chat.chatId || chat._id,
-        name: chat.participant?.username || 'Unknown User',
-        avatar: chat.participant?.profileImage || '',
-        participant: chat.participant
-      })));
     })
-    .catch(error => console.error('Error fetching chats:', error));
-  }, []);
+    .catch(error => console.error('❌ Error fetching chats:', error));
+  }, [currentUserId]);  // ✅ Depend on `currentUserId`
+  
+  
+  
+
 
   useEffect(() => {
     if (!selectedChat?.chatId) return;
-
-    //console.log('Starting message polling for chat:', selectedChat.chatId);
-
     const interval = setInterval(() => {
       fetch(`https://localhost:3000/api/messages/get-messages?chatId=${selectedChat.chatId}`, {
         credentials: 'include'
       })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-        return res.json();
-      })
+      .then(res => res.json())
       .then(data => {
-        //console.log('Fetched messages:', data);
         setSelectedChat(prev => ({ ...prev, messages: data.messages || [] }));
       })
       .catch(err => console.error('Error fetching messages:', err));
     }, 1000);
-
-    return () => {
-      //console.log('Stopping message polling');
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [selectedChat]);
 
   const handleSend = () => {
     if (!newMessage.trim() || !selectedChat?.chatId || !currentUserId) return;
-    console.log('Sending message:', newMessage);
     
     const messageData = {
       chatId: selectedChat.chatId,
-      sender: currentUserId,  // ✅ Use logged-in user's ID instead of "me"
+      sender: currentUserId,
       text: newMessage,
+      type: 'text', // ✅ Ensure type is sent
       timestamp: new Date().toISOString()
     };
-
+  
+    console.log('Sending message:', messageData); // 🔍 Debugging log
+  
     fetch('https://localhost:3000/api/messages/send-message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify(messageData)
     })
-    .then(res => {
-      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-      return res.json();
-    })
+    .then(res => res.json())
     .then(data => {
-      console.log('Message sent:', data);
-      setSelectedChat(prev => ({
-        ...prev,
-        messages: [...prev.messages, data.newMessage]
-      }));
+      if (data.newMessage) {
+        setSelectedChat(prev => ({
+          ...prev,
+          messages: [...prev.messages, data.newMessage]
+        }));
+      }
     })
     .catch(err => console.error('Error sending message:', err));
-
+  
     setNewMessage('');
   };
+  
+  const handleFileUpload = (file) => {  // ✅ Expect a file, not event
+    if (!file || !selectedChat?.chatId) {
+      console.error("No file selected or no chat chosen");
+      return;
+    }
+  
+    const formData = new FormData();
+    formData.append("image", file); 
+    formData.append("chatId", selectedChat.chatId);
+  
+    fetch("https://localhost:3000/api/messages/send-message", {
+      method: "POST",
+      credentials: "include",
+      body: formData
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.newMessage) {
+          setSelectedChat(prev => ({
+            ...prev,
+            messages: [...prev.messages, data.newMessage]
+          }));
+        }
+      })
+      .catch(err => console.error("Error uploading file:", err));
+  };
+  
 
   return (
     <Grid container sx={{ height: '100vh' }}>
@@ -117,10 +155,7 @@ const MessagesPage = () => {
         <ConversationList 
           conversations={conversations} 
           selectedChat={selectedChat} 
-          onSelect={(chat) => {
-            console.log('Selected chat:', chat);
-            setSelectedChat(chat);
-          }} 
+          onSelect={chat => setSelectedChat(chat)}
         />
       </Grid>
       <Grid item xs={12} md={8} sx={{ display: 'flex', flexDirection: 'column' }}>
@@ -135,13 +170,28 @@ const MessagesPage = () => {
                   key={index} 
                   message={message} 
                   isGroup={selectedChat.isGroup} 
-                  currentUserId={currentUserId} // ✅ Pass logged-in user's ID
+                  currentUserId={currentUserId}
+                  isImage={message.type === 'picture'} // Detect if it's an image
                 />
               ))}
               <div ref={messagesEndRef} />
             </Box>
-            <Box sx={{ position: 'sticky', bottom: '64px', bgcolor: 'grey.50', p: 1 }}>
-              <MessageInput value={newMessage} onChange={e => setNewMessage(e.target.value)} onSend={handleSend} />
+            <Box sx={{ position: 'sticky', bottom: '64px', bgcolor: 'grey.50', p: 1, display: 'flex', alignItems: 'center' }}>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                id="file-upload"
+                onChange={handleFileUpload}
+              />
+              <label htmlFor="file-upload">
+                
+              </label>
+              <MessageInput 
+              value={newMessage} 
+              onChange={e => setNewMessage(e.target.value)}
+               onSend={handleSend} 
+               onFileUpload={handleFileUpload} />
             </Box>
           </>
         ) : (
