@@ -1,7 +1,7 @@
-const test=false;
+const test=true;
 
 const config={
- BACKEND_URL:test?"http://localhost:3000":"https://192.168.2.250:3000",
+ BACKEND_URL:test?"https://localhost:3000":"https://192.168.2.250:3000",
  API_URL:test?"http://localhost:3000/":"https://192.168.2.250:3000/",
  TWILIO_ACCOUNT_SID:"AC000000",
  RECOVERY_CODE:"QV8TQPA5Y4FUQYL6WA5LVFU4",

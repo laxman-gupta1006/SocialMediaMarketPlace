@@ -1,254 +1,253 @@
 const express = require('express');
 const router = express.Router();
+const auth = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
-const Product = require('../models/Product');
-const auth = require('../middleware/auth');
-
-// Configure multer for file uploads
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs').promises;
+const Product = require('../models/Product'); // Critical import
+const Purchase=require('../models/Purchase');
+// Configure secure file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../uploads/marketplace');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    cb(null, 'uploads/marketplace/');
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+    const ext = path.extname(file.originalname);
+    const filename = `${uuidv4()}${ext}`;
+    cb(null, filename);
   }
 });
+
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'image/jpeg', 
+    'image/png', 
+    'image/webp'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JPG, PNG, and WEBP files are allowed'), false);
+  }
+};
 
 const upload = multer({
   storage,
+  fileFilter,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024 // 5MB default
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG and GIF are allowed.'));
-    }
+    fileSize: 10 * 1024 * 1024, // 10MB
+    files: 5
   }
 });
 
-// Get all products with filters and search
-router.get('/products', async (req, res) => {
+// Create product endpoint
+router.post('/AddProduct', auth, upload.array('images', 5), async (req, res) => {
+  let uploadedFiles = [];
+  
   try {
-    const {
+    // Validate required fields
+    const requiredFields = ['title', 'description', 'price', 'category', 'location', 'condition'];
+    const missingFields = requiredFields.filter(field => !req.body[field]);
+    
+    if (missingFields.length > 0) {
+      return res.status(400).json({ 
+        error: `Missing required fields: ${missingFields.join(', ')}` 
+      });
+    }
+
+    // Validate files
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'At least one image is required' });
+    }
+    uploadedFiles = req.files;
+
+    // Create product object
+    const productData = {
+      owner: req.userId,
+      title: req.body.title.trim(),
+      description: req.body.description.trim(),
+      price: parseFloat(req.body.price),
+      category: req.body.category,
+      location: req.body.location.trim(),
+      condition: req.body.condition,
+      images: req.files.map(file => 
+        path.join('uploads', 'marketplace', file.filename)
+      )
+    };
+
+    // Validate price
+    if (isNaN(productData.price) || productData.price < 0) {
+      return res.status(400).json({ error: 'Invalid price value' });
+    }
+
+    // Save to database
+    const product = new Product(productData);
+    const savedProduct = await product.save();
+
+    res.status(201).json(savedProduct);
+
+  } catch (error) {
+    // Cleanup uploaded files on error
+    if (uploadedFiles.length > 0) {
+      await Promise.all(uploadedFiles.map(async (file) => {
+        try {
+          await fs.unlink(file.path);
+          console.log(`Cleaned up file: ${file.path}`);
+        } catch (cleanupError) {
+          console.error('File cleanup failed:', cleanupError);
+        }
+      }));
+    }
+
+    // Handle errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ errors });
+    }
+    
+    console.error('Product creation error:', error);
+    res.status(500).json({ 
+      error: error.message || 'Failed to create product' 
+    });
+  }
+});
+
+// routes/products.js
+router.get('/search', async (req, res) => {
+  try {
+    // Parse query parameters with validation
+    const { 
+      q: searchQuery,
       category,
       minPrice,
       maxPrice,
       location,
-      condition,
-      search,
-      sort = 'newest'
+      condition
     } = req.query;
 
-    let query = { status: 'active' };
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 12));
 
-    // Apply filters
-    if (category) query.category = category;
-    if (location) query.location = location;
-    if (condition) query.condition = condition;
+    // Base filter for active products
+    const filter = { status: 'active' };
+
+    // Text search (using MongoDB text index)
+    if (searchQuery?.trim()) {
+      filter.$text = { $search: searchQuery.trim() };
+    }
+
+    // Category filter (supports multiple categories)
+    if (category) {
+      const categories = Array.isArray(category) ? category : [category];
+      filter.category = { 
+        $in: categories.filter(c => 
+          ['electronics', 'fashion', 'home', 'books', 'sports', 'other'].includes(c)
+        )
+      };
+    }
+
+    // Price range validation
     if (minPrice || maxPrice) {
-      query.price = {};
-      if (minPrice) query.price.$gte = Number(minPrice);
-      if (maxPrice) query.price.$lte = Number(maxPrice);
+      filter.price = {};
+      const min = parseFloat(minPrice);
+      const max = parseFloat(maxPrice);
+      
+      if (!isNaN(min) && min >= 0) filter.price.$gte = min;
+      if (!isNaN(max) && max >= 0) filter.price.$lte = max;
+      
+      // Remove price filter if invalid
+      if (Object.keys(filter.price).length === 0) delete filter.price;
     }
 
-    // Apply search
-    if (search) {
-      query.$text = { $search: search };
+    // Location search with regex sanitization
+    if (location?.trim()) {
+      const sanitizedLocation = location.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      filter.location = { $regex: new RegExp(sanitizedLocation, 'i') };
     }
 
-    // Apply sorting
-    let sortOption = {};
-    switch (sort) {
-      case 'price_asc':
-        sortOption = { price: 1 };
-        break;
-      case 'price_desc':
-        sortOption = { price: -1 };
-        break;
-      case 'popular':
-        sortOption = { likes: -1 };
-        break;
-      default:
-        sortOption = { createdAt: -1 };
+    // Condition filter (supports multiple conditions)
+    if (condition) {
+      const conditions = Array.isArray(condition) ? condition : [condition];
+      filter.condition = {
+        $in: conditions.filter(c =>
+          ['new', 'like_new', 'good', 'fair', 'poor'].includes(c)
+        )
+      };
     }
 
-    const products = await Product.find(query)
-      .sort(sortOption)
-      .populate('owner', 'username profileImage')
-      .lean();
+    // Execute parallel queries for data and count
+    const [products, count] = await Promise.all([
+      Product.find(filter)
+        .populate('owner', 'username')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Product.countDocuments(filter)
+    ]);
 
-    res.json({ products });
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ message: 'Error fetching products' });
-  }
-});
+    // Convert image paths to full URLs
+    const baseUrl = `https://localhost:3000`;
+// In your search route's projection
+const processedProducts = products.map(product => ({
+  ...product,
+  id: product._id,  // Add this line
+  images: product.images.map(img => `${baseUrl}/${img.replace(/\\/g, '/')}`),
+  owner: product.owner?.username || 'Unknown Seller'
+}));
 
-// Create a new product
-router.post('/products', auth, upload.array('images', 5), async (req, res) => {
-  try {
-    const {
-      title,
-      description,
-      price,
-      category,
-      location,
-      condition
-    } = req.body;
-
-    // Get file paths for uploaded images
-    const imageUrls = req.files.map(file => `/uploads/marketplace/${file.filename}`);
-
-    const product = new Product({
-      owner: req.user._id,
-      title,
-      description,
-      price: Number(price),
-      category,
-      location,
-      condition,
-      images: imageUrls
+    res.json({
+      products: processedProducts,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      totalResults: count
     });
 
-    await product.save();
-    res.status(201).json(product);
   } catch (error) {
-    console.error('Error creating product:', error);
-    res.status(500).json({ message: 'Error creating product' });
+    console.error('Search error:', error);
+    res.status(500).json({
+      error: 'Failed to perform search. Please try again later.',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
-// Get a single product
-router.get('/products/:id', async (req, res) => {
+
+router.post('/purchase/:productId', auth, async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id)
-      .populate('owner', 'username profileImage')
-      .populate('likes', 'username profileImage');
-
+    const product = await Product.findById(req.params.productId);
+    
     if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
+      return res.status(404).json({ error: 'Product not found' });
+    }
+    
+    if (product.status !== 'active') {
+      return res.status(400).json({ error: 'Product is no longer available' });
     }
 
-    res.json(product);
-  } catch (error) {
-    console.error('Error fetching product:', error);
-    res.status(500).json({ message: 'Error fetching product' });
-  }
-});
-
-// Update a product
-router.put('/products/:id', auth, upload.array('images', 5), async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    if (product.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to update this product' });
-    }
-
-    const {
-      title,
-      description,
-      price,
-      category,
-      location,
-      condition
-    } = req.body;
-
-    // Handle image updates
-    let imageUrls = product.images;
-    if (req.files && req.files.length > 0) {
-      // Delete old images
-      product.images.forEach(imageUrl => {
-        const imagePath = path.join(__dirname, '..', imageUrl);
-        if (fs.existsSync(imagePath)) {
-          fs.unlinkSync(imagePath);
-        }
-      });
-
-      // Get new image URLs
-      imageUrls = req.files.map(file => `/uploads/marketplace/${file.filename}`);
-    }
-
-    product.title = title;
-    product.description = description;
-    product.price = Number(price);
-    product.category = category;
-    product.location = location;
-    product.condition = condition;
-    product.images = imageUrls;
-
-    await product.save();
-    res.json(product);
-  } catch (error) {
-    console.error('Error updating product:', error);
-    res.status(500).json({ message: 'Error updating product' });
-  }
-});
-
-// Delete a product
-router.delete('/products/:id', auth, async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    if (product.owner.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to delete this product' });
-    }
-
-    // Delete images
-    product.images.forEach(imageUrl => {
-      const imagePath = path.join(__dirname, '..', imageUrl);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-      }
+    // Create purchase record
+    const purchase = new Purchase({
+      user: req.userId,
+      product: product._id,
+      paymentMethod: req.body.method,
+      paymentDetails: req.body.details,
+      amount: product.price,
+      status: 'completed' // Auto-approve for demo
     });
 
-    await product.remove();
-    res.json({ message: 'Product deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting product:', error);
-    res.status(500).json({ message: 'Error deleting product' });
-  }
-});
+    await purchase.save();
 
-// Like/Unlike a product
-router.post('/products/:id/like', auth, async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    const likeIndex = product.likes.indexOf(req.user._id);
-    if (likeIndex === -1) {
-      product.likes.push(req.user._id);
-    } else {
-      product.likes.splice(likeIndex, 1);
-    }
-
+    // Update product status
+    product.status = 'sold';
     await product.save();
-    res.json(product);
+
+    res.json({ message: 'Purchase completed successfully' });
   } catch (error) {
-    console.error('Error updating like status:', error);
-    res.status(500).json({ message: 'Error updating like status' });
+    console.error('Purchase error:', error);
+    res.status(500).json({ error: 'Failed to process payment' });
   }
 });
 
-module.exports = router; 
+module.exports = router;
