@@ -133,6 +133,70 @@ router.put('/update-profile',authMiddleware,[
       res.status(500).json({error:'Server error'});
     }
   });
+
+
+
+  router.post('/initiate-password-reset', [
+    body('email').isEmail().withMessage('Valid email required')
+  ], async (req, res) => {
+    try {
+      const { email } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+  
+      const otp = generateOTP();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  
+      // Save OTP with purpose
+      await OTPVerification.create({
+        email,
+        otp,
+        expiresAt,
+        purpose: 'password-reset'
+      });
+  
+      // Send email with OTP (implement your email sending logic here)
+      console.log(`Password reset OTP for ${email}: ${otp}`);
+  
+      res.json({ message: 'OTP sent to registered email' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
+  
+  // Confirm Password Reset
+  router.post('/confirm-password-reset', [
+    body('email').isEmail(),
+    body('otp').isLength(6),
+    body('newPassword').isLength({ min: 6 })
+  ], async (req, res) => {
+    try {
+      const { email, otp, newPassword } = req.body;
+      
+      const otpRecord = await OTPVerification.findOne({
+        email,
+        otp,
+        purpose: 'password-reset',
+        expiresAt: { $gt: new Date() }
+      });
+  
+      if (!otpRecord) return res.status(400).json({ error: 'Invalid or expired OTP' });
+  
+      const user = await User.findOne({ email });
+      if (!user) return res.status(404).json({ error: 'User not found' });
+  
+      user.password = await bcrypt.hash(newPassword, 10);
+      await user.save();
+      
+      await OTPVerification.deleteOne({ _id: otpRecord._id });
+  
+      res.json({ message: 'Password reset successful' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  });
   
   // Change password
   router.put('/change-password',authMiddleware,[

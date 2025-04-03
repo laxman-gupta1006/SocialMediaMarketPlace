@@ -6,17 +6,15 @@ import {
   Container, 
   Typography, 
   Divider,
-  Box,
-  Avatar,
-  IconButton
+  Box
 } from '@mui/material';
-import { Google, Group, Public } from '@mui/icons-material';
+import { Google } from '@mui/icons-material';
 import Logo from '../Logo';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const Login = ({ onLogin }) => {
 
+const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const { login } = useAuth();
@@ -86,10 +84,10 @@ const Login = ({ onLogin }) => {
                 />
               </Grid>
               {error && (
-      <Typography color="error" variant="body2" sx={{ mt: 2 }}>
-        {error}
-      </Typography>
-    )}
+                <Typography color="error" variant="body2" sx={{ mt: 2 }}>
+                  {error}
+                </Typography>
+              )}
               <Grid item xs={12}>
                 <Button 
                   fullWidth 
@@ -133,9 +131,9 @@ const Login = ({ onLogin }) => {
           </form>
         </Box>
 
-        {/* Signup Link */}
+        {/* Links Section */}
         <Box sx={{ mt: 3 }}>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             New to SocialSphere?{' '}
             <Button 
               color="primary" 
@@ -148,6 +146,21 @@ const Login = ({ onLogin }) => {
               }}
             >
               Create an account
+            </Button>
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Forgot Password?{' '}
+            <Button 
+              color="primary" 
+              size="small"
+              onClick={() => navigate('/ChangePassword')}
+              sx={{ 
+                textTransform: 'none', 
+                fontWeight: 700,
+                '&:hover': { background: 'none' }
+              }}
+            >
+              Reset Password
             </Button>
           </Typography>
         </Box>

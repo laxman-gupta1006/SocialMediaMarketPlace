@@ -53,7 +53,7 @@ const ProfilePost = ({ post }) => {
     }}>
       <CardMedia
         component="img"
-        image={post.image}
+        image={post.media}
         alt={post.caption}
         sx={{ 
           aspectRatio: '1/1',
