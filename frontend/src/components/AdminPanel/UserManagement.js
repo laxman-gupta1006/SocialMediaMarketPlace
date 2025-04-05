@@ -1,3 +1,4 @@
+// src/components/AdminPanel/UserManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Box, Tabs, Tab, Table, TableBody, TableCell, TableContainer, 
@@ -12,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import config from '../../Config/config';
+import VerificationRequests from './VerificationRequests';
 
 const BACKEND_URL = config.BACKEND_URL;
 
@@ -38,7 +40,7 @@ const UserManagement = () => {
     'full_access'
   ];
 
-  // Fetch users data
+  // Fetch users data for "User Management" tab (activeTab === 0)
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -48,13 +50,10 @@ const UserManagement = () => {
           limit: pagination.limit,
           search
         }).toString();
-        
         const response = await fetch(`${BACKEND_URL}/api/admin/users?${query}`, {
           credentials: 'include'
         });
-        
         if (!response.ok) throw new Error('Failed to fetch users');
-        
         const { users, total } = await response.json();
         setUsers(users);
         setPagination(prev => ({ ...prev, total }));
@@ -68,7 +67,7 @@ const UserManagement = () => {
     if (activeTab === 0) fetchUsers();
   }, [activeTab, pagination.page, search]);
 
-  // Fetch admin logs
+  // Fetch admin logs for "Admin Logs" tab (activeTab === 1)
   useEffect(() => {
     const fetchLogs = async () => {
       try {
@@ -76,7 +75,6 @@ const UserManagement = () => {
         const response = await fetch(`${BACKEND_URL}/api/admin/logs`, {
           credentials: 'include'
         });
-        
         if (!response.ok) throw new Error('Failed to fetch logs');
         const logs = await response.json();
         setLogs(logs);
@@ -97,14 +95,12 @@ const UserManagement = () => {
         `${BACKEND_URL}/api/admin/users/${userId}/${action}`, 
         { method: 'POST', credentials: 'include' }
       );
-      
       if (!response.ok) throw new Error(`${action} failed`);
-      
       setUsers(users.map(user => 
         user._id === userId ? { 
           ...user, 
           status: action === 'ban' ? 'banned' : 'active',
-          banned: action === 'ban' 
+          banned: action === 'ban'
         } : user
       ));
       setSuccess(`User ${action === 'ban' ? 'banned' : 'unbanned'} successfully`);
@@ -131,9 +127,7 @@ const UserManagement = () => {
             body: JSON.stringify({ permissions })
           }
         );
-        
         if (!response.ok) throw new Error('Failed to update permissions');
-        
         updatedUser = {
           ...selectedUser,
           permissions
@@ -149,9 +143,7 @@ const UserManagement = () => {
             body: JSON.stringify({ permissions })
           }
         );
-        
         if (!response.ok) throw new Error('Promotion failed');
-        
         const data = await response.json();
         updatedUser = {
           ...selectedUser,
@@ -184,9 +176,7 @@ const UserManagement = () => {
         `${BACKEND_URL}/api/admin/users/${userId}/demote`, 
         { method: 'POST', credentials: 'include' }
       );
-      
       if (!response.ok) throw new Error('Demotion failed');
-      
       setUsers(users.map(user => 
         user._id === userId ? {
           ...user,
@@ -209,9 +199,10 @@ const UserManagement = () => {
       <Tabs value={activeTab} onChange={(e, newVal) => setActiveTab(newVal)}>
         <Tab label="User Management" icon={<AssignmentInd />} />
         <Tab label="Admin Logs" icon={<Visibility />} />
+        <Tab label="Verification Requests" icon={<AdminPanelSettings />} />
       </Tabs>
 
-      {activeTab === 0 ? (
+      {activeTab === 0 && (
         <>
           <Box sx={{ display: 'flex', gap: 2, my: 3 }}>
             <TextField
@@ -225,7 +216,6 @@ const UserManagement = () => {
 
           <TableContainer component={Paper}>
             {loading.users && <LinearProgress />}
-            
             <Table>
               <TableHead>
                 <TableRow>
@@ -235,7 +225,6 @@ const UserManagement = () => {
                   <TableCell align="center">Actions</TableCell>
                 </TableRow>
               </TableHead>
-              
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user._id}>
@@ -353,10 +342,11 @@ const UserManagement = () => {
             />
           </TableContainer>
         </>
-      ) : (
+      )}
+
+      {activeTab === 1 && (
         <TableContainer component={Paper} sx={{ mt: 3 }}>
           {loading.logs && <LinearProgress />}
-          
           <Table>
             <TableHead>
               <TableRow>
@@ -367,7 +357,6 @@ const UserManagement = () => {
                 <TableCell>Timestamp</TableCell>
               </TableRow>
             </TableHead>
-            
             <TableBody>
               {logs.map((log) => (
                 <TableRow key={log._id}>
@@ -391,6 +380,12 @@ const UserManagement = () => {
         </TableContainer>
       )}
 
+      {activeTab === 2 && (
+        <Box sx={{ mt: 3 }}>
+          <VerificationRequests />
+        </Box>
+      )}
+
       {/* Permissions Dialog */}
       <Dialog open={!!selectedUser} onClose={() => setSelectedUser(null)}>
         <DialogTitle>
@@ -398,7 +393,6 @@ const UserManagement = () => {
             ? 'Edit Admin Permissions'
             : 'Promote to Admin'}
         </DialogTitle>
-        
         <DialogContent sx={{ minWidth: 400, pt: 2 }}>
           <Select
             multiple
@@ -428,12 +422,15 @@ const UserManagement = () => {
       </Dialog>
 
       {/* Notifications */}
-      <Snackbar open={!!error} onClose={() => setError('')}>
-        <Alert severity="error">{error}</Alert>
+      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError('')}>
+        <Alert severity="error" onClose={() => setError('')}>
+          {error}
+        </Alert>
       </Snackbar>
-      
-      <Snackbar open={!!success} onClose={() => setSuccess('')}>
-        <Alert severity="success">{success}</Alert>
+      <Snackbar open={!!success} autoHideDuration={6000} onClose={() => setSuccess('')}>
+        <Alert severity="success" onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
       </Snackbar>
     </Box>
   );

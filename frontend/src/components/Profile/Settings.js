@@ -1,4 +1,9 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import config from '../../Config/config';
+import RequestVerification from './RequestVerification';
+import AdminNotes from './AdminNotes';
 import { 
   Box, 
   Button, 
@@ -9,11 +14,15 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Divider,
+  Stack,
+  Card,
+  CardContent
 } from '@mui/material';
-import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import config from '../../Config/config';
+import SettingsIcon from '@mui/icons-material/Settings';
+import LockIcon from '@mui/icons-material/Lock';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 const BACKEND_URL = config.BACKEND_URL;
 
@@ -64,7 +73,7 @@ const Settings = () => {
       display: 'flex',
       justifyContent: 'center',
       minHeight: '100vh',
-      backgroundColor: '#fafafa',
+      backgroundColor: 'background.default',
       pt: 4
     }}>
       <Paper sx={{ 
@@ -72,73 +81,96 @@ const Settings = () => {
         mb: 8,
         borderRadius: 4,
         width: '100%',
-        maxWidth: '600px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+        maxWidth: '800px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.05)'
       }}>
-        <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-          Account Settings
-        </Typography>
-
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-            Privacy Settings
+        <Stack spacing={4}>
+          <Typography variant="h4" gutterBottom sx={{ fontWeight: 700 }}>
+            <SettingsIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+            Account Settings
           </Typography>
-          
-          <FormControlLabel
-            control={
-              <Switch
-                checked={profileVisibility === 'private'}
-                onChange={handleVisibilityChange}
-                disabled={loading}
-                color="primary"
-              />
-            }
-            label={
-              <Typography>
-                {profileVisibility === 'private' ? 'Private Profile' : 'Public Profile'}
+
+          <RequestVerification />
+          <AdminNotes />
+
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LockIcon fontSize="small" />
+                Privacy & Security
               </Typography>
-            }
-          />
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {profileVisibility === 'private' 
-              ? 'Only approved followers can see your posts' 
-              : 'Anyone can see your posts'}
-          </Typography>
-          {error && (
-            <Typography color="error" sx={{ mt: 1 }}>
-              {error}
-            </Typography>
-          )}
-        </Box>
+              
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={profileVisibility === 'private'}
+                    onChange={handleVisibilityChange}
+                    disabled={loading}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Profile Visibility</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {profileVisibility === 'private' 
+                        ? 'Your profile is currently private' 
+                        : 'Your profile is currently public'}
+                    </Typography>
+                  </Box>
+                }
+                sx={{ alignItems: 'flex-start' }}
+              />
+            </CardContent>
+          </Card>
 
-        <Box sx={{ borderTop: '1px solid #e0e0e0', pt: 3 }}>
-          <Button 
-            variant="contained" 
-            color="error"
-            onClick={() => setLogoutConfirmOpen(true)}
-            sx={{ width: '100%', py: 1.5 }}
-          >
-            Log Out
-          </Button>
-        </Box>
+          <Card variant="outlined" sx={{ borderColor: 'error.main' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LogoutIcon fontSize="small" />
+                Session Management
+              </Typography>
+              <Button 
+                variant="outlined" 
+                color="error"
+                onClick={() => setLogoutConfirmOpen(true)}
+                fullWidth
+                sx={{ py: 1.5 }}
+              >
+                Log Out All Sessions
+              </Button>
+            </CardContent>
+          </Card>
+        </Stack>
 
         {/* Logout confirmation dialog */}
         <Dialog
           open={logoutConfirmOpen}
           onClose={() => setLogoutConfirmOpen(false)}
+          PaperProps={{ sx: { borderRadius: 4 } }}
         >
-          <DialogTitle>Confirm Logout</DialogTitle>
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LogoutIcon color="error" />
+            Confirm Logout
+          </DialogTitle>
           <DialogContent>
-            <Typography>Are you sure you want to log out?</Typography>
+            <Typography>Are you sure you want to log out of all sessions?</Typography>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setLogoutConfirmOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={() => setLogoutConfirmOpen(false)}
+              variant="text"
+              sx={{ borderRadius: 2 }}
+            >
+              Cancel
+            </Button>
             <Button 
               onClick={handleLogout} 
               color="error"
               variant="contained"
+              sx={{ borderRadius: 2 }}
             >
-              Log Out
+              Confirm Logout
             </Button>
           </DialogActions>
         </Dialog>

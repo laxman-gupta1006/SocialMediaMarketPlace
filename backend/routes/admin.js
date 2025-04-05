@@ -287,4 +287,121 @@ router.delete('/users/:id',
   }
 );
 
+// ------------------- Verification Request Routes -------------------
+
+// Get pending verification requests
+router.get('/verification/requests',
+  authMiddleware,
+  requireAdmin,
+  hasPermission('manage_users'),
+  async (req, res) => {
+    try {
+      const requests = await User.find({ 'verification.verificationRequested': true })
+        .select('username fullName email verification');
+      res.json(requests);
+    } catch (error) {
+      console.error('Get verification requests error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+// Approve a verification request
+router.put('/verification/approve/:id',
+  authMiddleware,
+  requireAdmin,
+  hasPermission('manage_users'),
+  async (req, res) => {
+    try {
+      // Update the verification fields
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        {
+          'verification.adminVerified': true,
+          'verification.verificationRequested': false
+        },
+        { new: true }
+      );
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Add an admin note indicating approval
+      user.adminNotes.push({
+        content: 'Your verification request has been approved.',
+        createdBy: {
+          userId: req.userId,
+          username: 'Admin', // Replace with actual admin username if available
+          profileImage: ''   // Optionally include admin's profile image URL
+        },
+        action: 'verification_approved',
+        timestamp: new Date()
+      });
+      await user.save();
+
+      // Log the approval action in AdminLog
+      await new AdminLog({
+        admin: req.userId,
+        action: 'verification_approved',
+        targetUser: user._id,
+        details: { message: 'Verification request approved' }
+      }).save();
+
+      res.json({ message: 'User verification approved successfully', user });
+    } catch (error) {
+      console.error('Approve verification error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+// Reject a verification request
+router.put('/verification/reject/:id',
+  authMiddleware,
+  requireAdmin,
+  hasPermission('manage_users'),
+  async (req, res) => {
+    try {
+      // Update the verification fields to reject the request
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        {
+          'verification.verificationRequested': false,
+          'verification.document': ''
+        },
+        { new: true }
+      );
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      // Add an admin note indicating rejection
+      user.adminNotes.push({
+        content: 'Your verification request has been rejected.',
+        createdBy: {
+          userId: req.userId,
+          username: 'Admin', // Replace with actual admin username if available
+          profileImage: ''   // Optionally include admin's profile image URL
+        },
+        action: 'verification_rejected',
+        timestamp: new Date()
+      });
+      await user.save();
+
+      // Log the rejection action in AdminLog
+      await new AdminLog({
+        admin: req.userId,
+        action: 'verification_rejected',
+        targetUser: user._id,
+        details: { message: 'Verification request rejected' }
+      }).save();
+
+      res.json({ message: 'User verification request rejected successfully', user });
+    } catch (error) {
+      console.error('Reject verification error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
 module.exports = router;

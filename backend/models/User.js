@@ -136,7 +136,10 @@ roles: [{
 verification: {
   emailVerified: Boolean,
   phoneVerified: Boolean,
-  twoFactorEnabled: Boolean
+  twoFactorEnabled: Boolean,
+  adminVerified: Boolean,
+  verificationRequested: { type: Boolean, default: false },
+  document: { type: String, default: '' }
 },
 banned: {
   type: Boolean,

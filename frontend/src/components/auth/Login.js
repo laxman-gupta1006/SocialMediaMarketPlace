@@ -132,7 +132,7 @@ const Login = ({ onLogin }) => {
             </Grid>
           </form>
         </Box>
-
+        
         {/* Signup Link */}
         <Box sx={{ mt: 3 }}>
           <Typography variant="body2" color="text.secondary">
@@ -148,6 +148,23 @@ const Login = ({ onLogin }) => {
               }}
             >
               Create an account
+            </Button>
+          </Typography>
+          
+        </Box>
+         <Box sx={{ mt: 3 }}>
+          <Typography variant="body2" color="text.secondary">
+            <Button 
+              color="primary" 
+              size="small"
+              onClick={() => navigate('/forgot-password')}
+              sx={{ 
+                textTransform: 'none', 
+                fontWeight: 700,
+                '&:hover': { background: 'none' }
+              }}
+            >
+              Forgot Password?
             </Button>
           </Typography>
         </Box>

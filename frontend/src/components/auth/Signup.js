@@ -27,8 +27,7 @@ const Signup = () => {
     email: '',
     username: '',
     fullName: '',
-    password: '',
-    phoneNumber: ''
+    password: ''
   });
   const [otp, setOtp] = useState('');
   const [errors, setErrors] = useState({});
@@ -57,9 +56,6 @@ const Signup = () => {
       tempErrors.password = 'Password must be at least 6 characters long';
     } else if (!strongPasswordRegex.test(formData.password)) {
       tempErrors.password = 'Password must contain an uppercase letter, a number, and a special character';
-    }
-    if (formData.phoneNumber && !/^\+?[1-9]\d{1,14}$/.test(formData.phoneNumber)) {
-      tempErrors.phoneNumber = 'Enter a valid phone number';
     }
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
@@ -91,10 +87,9 @@ const Signup = () => {
 
     try {
       await axios.post('https://192.168.2.250:3000/api/auth/send-otp', {
-        email: formData.email,
-        phoneNumber: formData.phoneNumber
+        email: formData.email
       });
-      setSuccess('OTP sent successfully! Please check your email/phone.');
+      setSuccess('OTP sent successfully! Please check your email.');
       setStep(2);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to send OTP');
@@ -114,7 +109,6 @@ const Signup = () => {
         ...formData,
         otp
       });
-      await signup(formData);
       setSuccess('Account created successfully!');
       setTimeout(() => {
         navigate('/dashboard');
@@ -173,17 +167,6 @@ const Signup = () => {
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="Phone Number (Optional)"
-                      variant="outlined"
-                      value={formData.phoneNumber}
-                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                      error={!!errors.phoneNumber}
-                      helperText={errors.phoneNumber}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
                       label="Username"
                       variant="outlined"
                       value={formData.username}
@@ -220,7 +203,12 @@ const Signup = () => {
                       helperText={errors.password}
                       required
                     />
-                    <LinearProgress variant="determinate" value={passwordStrength} color={getPasswordStrengthColor()} sx={{ mt: 1 }} />
+                    <LinearProgress
+                      variant="determinate"
+                      value={passwordStrength}
+                      color={getPasswordStrengthColor()}
+                      sx={{ mt: 1 }}
+                    />
                   </Grid>
                   <Grid item xs={12}>
                     <Button 

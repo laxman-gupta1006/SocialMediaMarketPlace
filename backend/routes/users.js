@@ -418,4 +418,20 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// GET /api/users/admin-notes
+router.get('/admin-notes', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('adminNotes');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    // Return notes sorted by latest
+    const notes = user.adminNotes.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+    res.json({ notes });
+  } catch (error) {
+    console.error('Fetch admin notes error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 module.exports = router;

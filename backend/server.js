@@ -13,6 +13,7 @@ const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
 const marketplaceRoutes = require('./routes/marketplace');
 const adminRoutes= require('./routes/admin');
+const verificationRoutes = require('./routes/verification');
 require('./config/dbConfig');
 
 const app = express();
@@ -89,6 +90,8 @@ app.use('/api/users', usersRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/verification', verificationRoutes);
+
 // 8. Global error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

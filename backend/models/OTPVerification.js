@@ -5,7 +5,8 @@ const OTPVerificationSchema = new mongoose.Schema({
   phoneNumber: { type: String },
   otp: { type: String, required: true },
   expiresAt: { type: Date, required: true },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  purpose: { type: String, required: true }
 });
 
 // TTL index for auto-deletion after expiration

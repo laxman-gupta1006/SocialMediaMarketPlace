@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const Product = require('../models/Product'); // Critical import
 const Purchase=require('../models/Purchase');
+const requireAdminVerified = require('../middleware/requireAdminVerified');
 // Configure secure file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -43,7 +44,7 @@ const upload = multer({
 });
 
 // Create product endpoint
-router.post('/AddProduct', auth, upload.array('images', 5), async (req, res) => {
+router.post('/AddProduct', auth,requireAdminVerified, upload.array('images', 5), async (req, res) => {
   let uploadedFiles = [];
   
   try {
@@ -215,7 +216,7 @@ const processedProducts = products.map(product => ({
 });
 
 
-router.post('/purchase/:productId', auth, async (req, res) => {
+router.post('/purchase/:productId', auth,requireAdminVerified, async (req, res) => {
   try {
     const product = await Product.findById(req.params.productId);
     
@@ -254,7 +255,7 @@ router.post('/purchase/:productId', auth, async (req, res) => {
 // Add these new routes
 
 // Get user's purchases
-router.get('/purchases', auth, async (req, res) => {
+router.get('/purchases', auth,requireAdminVerified, async (req, res) => {
   try {
     const purchases = await Purchase.find({ user: req.userId })
       .populate({
