@@ -7,21 +7,23 @@ const authMiddleware = require("../middleware/auth");
 const User = require("../models/User");
 const Chat = require("../models/Chat");
 const Message = require("../models/Message");
-const mongoose = require("mongoose"); // Ensure mongoose is imported
+const mongoose = require("mongoose");
+
+// ✅ Use getIO from socket.js (not server.js anymore)
+const { getIO } = require("../socket");
 
 // ✅ Configure multer for image uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/posts/"); // Save files to this directory
+    cb(null, "uploads/posts/");
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const fileName = uuidv4() + ext; // Rename file with UUID
+    const fileName = uuidv4() + ext;
     cb(null, fileName);
   }
 });
 
-// ✅ File filter to allow only images
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
   if (allowedTypes.includes(file.mimetype)) {
@@ -37,11 +39,7 @@ const upload = multer({ storage, fileFilter });
 router.get("/user-info", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("username");
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
+    if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ userId: req.userId, username: user.username });
   } catch (error) {
     console.error("Error fetching user info:", error);
@@ -53,11 +51,7 @@ router.get("/user-info", authMiddleware, async (req, res) => {
 router.get("/my-following", authMiddleware, async (req, res) => {
   try {
     const user = await User.findById(req.userId).lean();
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
+    if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ following: user.following });
   } catch (error) {
     console.error("Error fetching following list:", error);
@@ -65,59 +59,30 @@ router.get("/my-following", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Get chat list with participant names (excluding self)
-// ✅ Get chat list with participant names (excluding self)
+// ✅ Get chat list with participant names
 router.get("/my-chats", authMiddleware, async (req, res) => {
   try {
-    const userId = req.userId; // Authenticated user's ID
-    console.log("🟢 Logged-in User ID:", userId);
-
-    // Fetch all chats where the user is a participant
+    const userId = req.userId;
     const chats = await Chat.find({ participants: userId })
       .select("participants name isGroup")
       .lean();
 
-    console.log("📌 Retrieved Chats:", chats);
+    if (!chats.length) return res.status(200).json({ chats: [] });
 
-    if (!chats.length) {
-      return res.status(200).json({ chats: [] }); // No chats found
-    }
-
-    // Get unique participant IDs (excluding the user itself)
     const allParticipantIds = [...new Set(chats.flatMap(chat => chat.participants))];
 
-    console.log("🔍 Fetching user data for participant IDs:", allParticipantIds);
-
-    // Fetch usernames and profile images for all participants
     const users = await User.find({ _id: { $in: allParticipantIds } })
       .select("_id username profileImage")
       .lean();
 
-    console.log("✅ Retrieved User Data:", users);
-
-    // Create a user lookup map
     const userMap = {};
     users.forEach(user => {
       userMap[user._id.toString()] = user;
     });
 
-    console.log("🗺️ User Mapping:", userMap);
-
-    // Constructing chat data
     const chatData = chats.map(chat => {
-      console.log(`🔄 Processing Chat: ${chat._id}`);
-      console.log("👥 Participants:", chat.participants);
-
-      // Identify the other participant by excluding the logged-in user
       const otherParticipantId = chat.participants.find(id => id.toString() !== userId);
-
-      console.log("🆚 Other Participant ID:", otherParticipantId);
-
-      // Get the other participant's details
       const otherParticipant = userMap[otherParticipantId?.toString()];
-
-      console.log("🆚 Selected Other Participant:", otherParticipant);
-
       return {
         chatId: chat._id,
         name: chat.isGroup
@@ -135,8 +100,6 @@ router.get("/my-chats", authMiddleware, async (req, res) => {
       };
     });
 
-    console.log("✅ Final Chat Data:", chatData);
-
     res.json({ chats: chatData });
   } catch (error) {
     console.error("❌ Error fetching user chats:", error);
@@ -144,24 +107,15 @@ router.get("/my-chats", authMiddleware, async (req, res) => {
   }
 });
 
-
-
-
-
-
-
 // ✅ Get chat ID between two users
 router.get("/get-chat-id", authMiddleware, async (req, res) => {
   try {
     const { user1, user2 } = req.query;
-
     const chat = await Chat.findOne({
       participants: { $all: [user1, user2] }
     });
 
-    if (!chat) {
-      return res.status(404).json({ error: "Chat not found" });
-    }
+    if (!chat) return res.status(404).json({ error: "Chat not found" });
 
     res.json({ chatId: chat._id });
   } catch (error) {
@@ -171,15 +125,12 @@ router.get("/get-chat-id", authMiddleware, async (req, res) => {
 });
 
 // ✅ Get messages for a specific chat ID
-// ✅ Get messages for a specific chat ID
 router.get("/get-messages", authMiddleware, async (req, res) => {
   try {
     const { chatId } = req.query;
-
     const messages = await Message.find({ chatId })
       .sort({ timestamp: 1 })
-      .populate("sender", "username profileImage"); // 🔥 Add this line
-
+      .populate("sender", "username profileImage");
     res.json({ messages });
   } catch (error) {
     console.error("Error fetching messages:", error);
@@ -187,13 +138,13 @@ router.get("/get-messages", authMiddleware, async (req, res) => {
   }
 });
 
-
-// ✅ Send a new message (Supports text & image uploads)
+// ✅ Send a new message (with socket.io emit)
+// ✅ Send a new message (emit only a signal to refetch)
 router.post("/send-message", authMiddleware, upload.single("image"), async (req, res) => {
   try {
-    console.log("Received message data:", req.body); // 🔍 Debug log
+    console.log("Received message data:", req.body);
 
-    const { chatId, text, type } = req.body;  // Extract `type`
+    const { chatId, text, type } = req.body;
     const sender = req.userId;
 
     if (!chatId) {
@@ -204,12 +155,12 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
       chatId,
       sender,
       timestamp: new Date(),
-      type,  // ✅ Ensure type is included
+      type,
     };
 
     if (req.file) {
       messageData.text = `/uploads/posts/${req.file.filename}`;
-      messageData.type = "picture"; // ✅ Override type for images
+      messageData.type = "picture";
     } else {
       if (!text) {
         return res.status(400).json({ error: "Text message cannot be empty." });
@@ -218,6 +169,10 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
     }
 
     const newMessage = await Message.create(messageData);
+
+    // ✅ Emit only a signal to clients in this chat room to refetch messages
+    getIO().to(chatId).emit("newMessageSignal", { chatId });
+
     res.status(201).json({ success: true, newMessage });
 
   } catch (error) {
@@ -227,34 +182,26 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
 });
 
 
+// ✅ Create a group chat
 router.post("/addgroup", authMiddleware, async (req, res) => {
   try {
     const { groupName, participantIds } = req.body;
     const creatorId = req.userId;
 
-    console.log("📥 Received group creation request:");
-    console.log("👤 Creator ID:", creatorId);
-    console.log("🧑‍🤝‍🧑 Participant IDs:", participantIds);
-    console.log("📛 Group Name:", groupName);
-
     if (!groupName || !Array.isArray(participantIds) || participantIds.length === 0) {
       return res.status(400).json({ error: "Group name and participants are required" });
     }
 
-    // Combine all unique participants including the creator
     const allParticipants = Array.from(new Set([...participantIds, creatorId]));
 
-    // Convert all to ObjectId
     const participantObjectIds = allParticipants.map(id => new mongoose.Types.ObjectId(id));
 
-    // Create the group chat document
     const newGroupChat = await Chat.create({
       name: groupName,
       participants: participantObjectIds,
       isGroup: true
     });
 
-    // ✅ Respond to frontend
     res.status(201).json({
       success: true,
       chat: newGroupChat,
@@ -270,8 +217,4 @@ router.post("/addgroup", authMiddleware, async (req, res) => {
   }
 });
 
-
-
-
-// ✅ Export the router
 module.exports = router;

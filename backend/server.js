@@ -1,22 +1,17 @@
-
 const express = require('express');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const authRoutes = require('./routes/auth');
-const usersRoutes = require('./routes/users');
-const postsRoutes = require('./routes/posts');
-const marketplaceRoutes = require('./routes/marketplace');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 require('./config/dbConfig');
 require('dotenv').config();
 
-
-
-const messagesRoutes = require('./routes/messages'); // Import messages routes [for routing messages added by deepankar]
-
-
+const authRoutes = require('./routes/auth');
+const usersRoutes = require('./routes/users');
+const postsRoutes = require('./routes/posts');
+const marketplaceRoutes = require('./routes/marketplace');
+const messagesRoutes = require('./routes/messages');
 
 const app = express();
 
@@ -28,7 +23,7 @@ app.use((req, res, next) => {
 });
 
 // 2. Body parser & cookies
-app.use(express.json({ limit: '10mb' })); // Increased for image uploads
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 // 3. CORS Configuration
@@ -51,20 +46,15 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// 4. Static Files Configuration (CRUCIAL FOR IMAGES)
+// 4. Static Files
 const uploadsDir = path.join(__dirname, 'uploads');
-// Create uploads directory if it doesn't exist
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Serve static files with proper caching and security headers
 app.use('/uploads', express.static(uploadsDir, {
   setHeaders: (res, filePath) => {
-    // Security headers for static files
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    
-    // Cache control (1 day for images)
     if (filePath.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
       res.setHeader('Cache-Control', 'public, max-age=86400');
     }
@@ -76,11 +66,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/messages', messagesRoutes);
 
-// for routing messages added by deepankar
-app.use('/api/messages', messagesRoutes); // Register messages API
-
-// 6. Error handling middleware
+// 6. Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
@@ -90,22 +78,26 @@ app.use((err, req, res, next) => {
 const sslOptions = {
   key: fs.readFileSync(path.join(__dirname, 'certs', 'server.key')),
   cert: fs.readFileSync(path.join(__dirname, 'certs', 'server.cert')),
-  // For additional security:
   minVersion: 'TLSv1.2',
   ciphers: [
     'ECDHE-ECDSA-AES256-GCM-SHA384',
-    'ECDHE-RSA-AES256-GCM-SHA384',
-    // Add other secure ciphers as needed
+    'ECDHE-RSA-AES256-GCM-SHA384'
   ].join(':'),
   honorCipherOrder: true
 };
 
-// 8. HTTPS Server
+// 8. Create HTTPS Server
 const server = https.createServer(sslOptions, app);
+
+// 9. Initialize socket.io using external socket.js
+const { initSocket } = require('./socket');
+initSocket(server, allowedOrigins); // Sets up and manages socket events
+
+// 10. Start server
 const PORT = 3000;
-const HOST = 'localhost'; // Using your specific IP
+const HOST = 'localhost';
 
 server.listen(PORT, HOST, () => {
-  console.log(`Secure server running on https://${HOST}:${PORT}`);
-  console.log(`Serving static files from: ${uploadsDir}`);
+  console.log(`✅ Secure server running at https://${HOST}:${PORT}`);
+  console.log(`🖼️ Serving static files from: ${uploadsDir}`);
 });
