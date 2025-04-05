@@ -40,7 +40,7 @@ const ProtectedRoute = ({ children }) => {
 
 const AdminRoute = ({ children }) => {
   const { user } = useAuth();
-  return user?.role === 'admin' ? children : <Navigate to="/" replace />;
+  return user?.roles?.includes('admin') ? children : <Navigate to="/" replace />;
 };
 
 const App = () => {
@@ -62,7 +62,12 @@ const App = () => {
             {/* Public Routes */}
             <Route path="/login" element={user ? <Navigate to="/" /> : <Login />} />
             <Route path="/signup" element={user ? <Navigate to="/" /> : <Signup />} />
-
+                  {/* Admin Routes */}
+              <Route path="/admin/*" element={
+              <AdminRoute>
+                <AdminRouter />
+              </AdminRoute>
+            } />
             {/* Protected User Routes */}
             <Route path="/" element={
               <ProtectedRoute>
@@ -71,12 +76,13 @@ const App = () => {
               </ProtectedRoute>
             } />
             
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <ProfilePage />
-                <Navigation />
-              </ProtectedRoute>
-            } />
+            <Route path="/profile/:userId?" element={
+  <ProtectedRoute>
+    <ProfilePage />
+    <Navigation />
+  </ProtectedRoute>
+} />
+
 
             <Route path="/new-post" element={
               <ProtectedRoute>
@@ -106,12 +112,7 @@ const App = () => {
               </ProtectedRoute>
             } />
 
-            {/* Admin Routes */}
-            <Route path="/admin/*" element={
-              <AdminRoute>
-                <AdminRouter />
-              </AdminRoute>
-            } />
+
 
             {/* Fallback Route */}
             <Route path="*" element={<Navigate to="/" />} />

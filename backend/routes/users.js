@@ -65,7 +65,7 @@ router.post('/profile-photo', authMiddleware, upload.single('photo'), async (req
     // Update user's profile image path
     const relativePhotoPath = '/uploads/profiles/' + req.file.filename;
     user.profileImage = relativePhotoPath;
-    await user.save();
+    await user.save({ validateModifiedOnly: true });
 
     res.json({
       message: 'Profile photo updated successfully',
@@ -234,10 +234,11 @@ router.put('/update', authMiddleware, async (req, res) => {
 router.get('/search', authMiddleware, async (req, res) => {
   try {
     const { query } = req.query;
-    
+
     if (!query || query.trim().length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
+    
 
     const currentUser = await User.findById(req.userId);
     if (!currentUser) {
@@ -264,7 +265,9 @@ router.get('/search', authMiddleware, async (req, res) => {
 
     const resultsWithStatus = searchResults.map(user => ({
       ...user,
-      isFollowing: currentUser.following.some(id => id.toString() === user._id.toString()),
+      isFollowing: currentUser.following.some(
+        followingUser => followingUser.userId && followingUser.userId.toString() === user._id.toString()
+      ),      
       followersCount: user.followers.length,
       isPrivate: user.privacySettings?.profileVisibility === 'private'
     }));
@@ -275,46 +278,54 @@ router.get('/search', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-// Updated follow route
+// Updated follow route with error handling
 router.post('/follow/:userId', authMiddleware, async (req, res) => {
   try {
-    const targetUser = await User.findById(req.params.userId);
+    const targetUser = await User.findById(req.params.userId).lean();
     const currentUser = await User.findById(req.userId);
 
     if (!targetUser || !currentUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Add to current user's following
+    // Ensure following array exists
+    if (!Array.isArray(currentUser.following)) {
+      currentUser.following = [];
+    }
+    // Check if already following (prevent undefined userId errors)
+    const isAlreadyFollowing = currentUser.following.some((followingUser) => {
+      return followingUser?.userId && followingUser.userId.toString() === req.params.userId;
+    });
+    if (isAlreadyFollowing) {
+      return res.status(400).json({ error: 'Already following this user' });
+    }
+    // Add to current user's following list
     await User.findByIdAndUpdate(req.userId, {
       $addToSet: {
         following: {
           userId: targetUser._id,
           username: targetUser.username,
-          profileImage: targetUser.profileImage
-        }
-      }
+          profileImage: targetUser.profileImage,
+        },
+      },
     });
 
-    // Add to target user's followers
+    // Add to target user's followers list
     await User.findByIdAndUpdate(targetUser._id, {
       $addToSet: {
         followers: {
           userId: currentUser._id,
           username: currentUser.username,
-          profileImage: currentUser.profileImage
-        }
-      }
+          profileImage: currentUser.profileImage,
+        },
+      },
     });
 
-    const updatedUser = await User.findById(targetUser._id);
-    
+    const updatedUser = await User.findById(targetUser._id).lean();
     res.json({
       success: true,
-      followersCount: updatedUser.followers.length,
+      followersCount: updatedUser?.followers?.length || 0,
       isFollowing: true,
-      followers: updatedUser.followers
     });
   } catch (error) {
     console.error('Follow error:', error);
@@ -326,7 +337,15 @@ router.post('/follow/:userId', authMiddleware, async (req, res) => {
 router.post('/unfollow/:userId', authMiddleware, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.userId);
+    
     const currentUser = await User.findById(req.userId);
+    const isFollowing = Array.isArray(currentUser.following) && currentUser.following.some(
+      followingUser => followingUser.userId && followingUser.userId.toString() === req.params.userId
+    );
+    
+    if (!isFollowing) {
+      return res.status(400).json({ error: 'Not following this user' });
+    }
 
     if (!targetUser || !currentUser) {
       return res.status(404).json({ error: 'User not found' });
@@ -343,18 +362,19 @@ router.post('/unfollow/:userId', authMiddleware, async (req, res) => {
     });
 
     const updatedUser = await User.findById(targetUser._id);
-    
+
     res.json({
       success: true,
       followersCount: updatedUser.followers.length,
       isFollowing: false,
-      followers: updatedUser.followers
+      
     });
   } catch (error) {
     console.error('Unfollow error:', error);
     res.status(500).json({ error: 'Failed to unfollow user' });
   }
 });
+
 
 // @route   GET /api/users/follow-status/:userId
 // @desc    Check follow status between users

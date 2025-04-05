@@ -1,4 +1,4 @@
-const test=true;
+const test=false;
 
 const config={
  BACKEND_URL:test?"https://localhost:3000":"https://192.168.2.250:3000",

@@ -89,20 +89,72 @@ const userSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  },
+lastActive: {
+  type: Date,
+  default: Date.now
+},
+adminNotes: [{
+  content: String,
+  createdBy: {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    username: {
+      type: String,
+      required: true
+    },
+    profileImage: {
+      type: String,
+      default: ''
+    }
+  },
+  action: String,
+  timestamp: {
+    type: Date,
+    default: Date.now
   }
+}],
+loginHistory: [{
+  ip: String,
+  device: String,
+  location: String,
+  timestamp: Date
+}],
+status: {
+  type: String,
+  enum: ['active', 'banned', 'suspended', 'deactivated'],
+  default: 'active'
+},
+roles: [{
+  type: String,
+  enum: ['user', 'admin'],
+  default: ['user']
+}],
+verification: {
+  emailVerified: Boolean,
+  phoneVerified: Boolean,
+  twoFactorEnabled: Boolean
+},
+banned: {
+  type: Boolean,
+  default: false
+}
 }, {
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Virtual fields for counts
 userSchema.virtual('followersCount').get(function() {
-  return this.followers.length;
+  return this.followers ? this.followers.length : 0;
 });
 
 userSchema.virtual('followingCount').get(function() {
-  return this.following.length;
+  return this.following ? this.following.length : 0;
 });
+
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {

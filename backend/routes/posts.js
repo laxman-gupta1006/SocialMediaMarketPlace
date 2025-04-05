@@ -109,7 +109,7 @@ router.post('/', authMiddleware, upload.single('media'), async (req, res) => {
     res.status(500).json({ error: 'Failed to create post' });
   }
 });
-// Get posts with visibility rules
+// Get posts with updated visibility rules
 router.get('/', authMiddleware, async (req, res) => {
   try {
     const userId = req.userId;
@@ -117,28 +117,21 @@ router.get('/', authMiddleware, async (req, res) => {
 
     // Get user's following list
     const currentUser = await User.findById(userId).select('following');
-    const followingIds = currentUser.following;
+    // Assuming following is an array of objects with a `userId` property
+    const followingIds = currentUser.following.map(f => f.userId);
 
-    // Build visibility query
+    // Build query:
+    // - Public posts: visible to everyone.
+    // - Non-public posts (private or followers): visible only if the post author is in your following list.
+    // - Always include your own posts.
     const query = {
       $or: [
         { visibility: 'public' },
-        { 
-          $and: [
-            { visibility: 'private' },
-            { userId: userId } // Only owner sees their private posts
-          ]
-        },
+        { userId: userId },
         {
           $and: [
-            { visibility: 'followers' },
-            { 
-              $or: [
-                { userId: { $in: followingIds } }, // Posts from followed users
-                { userId: userId }, // Own posts
-                { authorizedUsers: { $in: [userId] } } // Explicitly authorized
-              ]
-            }
+            { userId: { $in: followingIds } },
+            { visibility: { $ne: 'public' } }
           ]
         }
       ]
@@ -152,31 +145,30 @@ router.get('/', authMiddleware, async (req, res) => {
       .lean();
 
     // Format response
-   // In your GET /api/posts route
-const formattedPosts = posts.map(post => ({
-  _id: post._id,
-  userId: post.userId._id,
-  username: post.userId.username,
-  profileImage: post.userId.profileImage 
-    ? "https://192.168.2.250:3000" + post.userId.profileImage 
-    : null,
-  media: "https://192.168.2.250:3000" + post.media, // Unified media field
-  mediaType: post.mediaType, // This should always be set
-  caption: post.caption,
-  likes: post.likes,
-  comments: post.comments.map(comment => ({
-    _id: comment._id,
-    userId: comment.userId,
-    username: comment.username,
-    profileImage: comment.profileImage 
-      ? "https://192.168.2.250:3000" + comment.profileImage 
-      : null,
-    text: comment.text,
-    createdAt: comment.createdAt
-  })),
-  hasLiked: post.likes.includes(userId),
-  createdAt: post.createdAt
-}));
+    const formattedPosts = posts.map(post => ({
+      _id: post._id,
+      userId: post.userId._id,
+      username: post.userId.username,
+      profileImage: post.userId.profileImage 
+        ? "https://192.168.2.250:3000" + post.userId.profileImage 
+        : null,
+      media: "https://192.168.2.250:3000" + post.media,
+      mediaType: post.mediaType,
+      caption: post.caption,
+      likes: post.likes,
+      comments: post.comments.map(comment => ({
+        _id: comment._id,
+        userId: comment.userId,
+        username: comment.username,
+        profileImage: comment.profileImage 
+          ? "https://192.168.2.250:3000" + comment.profileImage 
+          : null,
+        text: comment.text,
+        createdAt: comment.createdAt
+      })),
+      hasLiked: post.likes.includes(userId),
+      createdAt: post.createdAt
+    }));
 
     res.json(formattedPosts);
   } catch (error) {
@@ -184,6 +176,8 @@ const formattedPosts = posts.map(post => ({
     res.status(500).json({ error: 'Failed to fetch posts' });
   }
 });
+
+
 router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
     const userId = req.params.userId;

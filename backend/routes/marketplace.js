@@ -189,7 +189,7 @@ router.get('/search', async (req, res) => {
     ]);
 
     // Convert image paths to full URLs
-    const baseUrl = `https://localhost:3000`;
+    const baseUrl = `https://192.168.2.250:3000`;
 // In your search route's projection
 const processedProducts = products.map(product => ({
   ...product,
@@ -247,6 +247,40 @@ router.post('/purchase/:productId', auth, async (req, res) => {
   } catch (error) {
     console.error('Purchase error:', error);
     res.status(500).json({ error: 'Failed to process payment' });
+  }
+});
+
+// routes/marketplace.js
+// Add these new routes
+
+// Get user's purchases
+router.get('/purchases', auth, async (req, res) => {
+  try {
+    const purchases = await Purchase.find({ user: req.userId })
+      .populate({
+        path: 'product',
+        populate: { path: 'owner', select: 'username' }
+      })
+      .sort({ createdAt: -1 });
+
+    res.json(purchases);
+  } catch (error) {
+    console.error('Error fetching purchases:', error);
+    res.status(500).json({ error: 'Failed to fetch purchases' });
+  }
+});
+
+// Get user's listings
+router.get('/my-listings', auth, async (req, res) => {
+  try {
+    const listings = await Product.find({ owner: req.userId })
+      .populate('owner', 'username')
+      .sort({ createdAt: -1 });
+
+    res.json(listings);
+  } catch (error) {
+    console.error('Error fetching listings:', error);
+    res.status(500).json({ error: 'Failed to fetch listings' });
   }
 });
 

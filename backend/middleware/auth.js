@@ -23,8 +23,7 @@ module.exports = async (req, res, next) => {
       res.clearCookie('token');
       return res.status(401).json({ error: 'Invalid token structure' });
     }
-
-    // 4. Attach user ID to request
+    
     req.userId = decoded.userId;
     
     // 5. Security headers for browser requests

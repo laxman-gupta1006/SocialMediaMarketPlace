@@ -5,75 +5,91 @@ import EditProfileDialog from '../components/Profile/EditProfile';
 import ProfileHeader from '../components/Profile/ProfileHeader';
 import ProfilePost from '../components/Profile/ProfilePost';
 import config from '../Config/config';
+import { useParams } from 'react-router-dom';
 
 const BACKEND_URL = config.BACKEND_URL;
 
 const ProfilePage = () => {
   const { user: currentUser, loading: authLoading, checkAuth } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [error, setError] = useState(null);
+  const { userId } = useParams(); // Get userId from URL params
 
   useEffect(() => {
-   // In your fetchPosts function
-const fetchPosts = async () => {
-  if (!currentUser?._id) return;
-  try {
-    setLoadingPosts(true);
-    const res = await fetch(`${BACKEND_URL}/api/posts/user/${currentUser._id}`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { 
-        'Content-Type': 'application/json'
+    const fetchUserProfile = async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/users/user/${userId || currentUser._id}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
+
+        // Note: backend returns the user object directly, not wrapped in "user"
+        const data = await res.json();
+        setUserProfile(data);
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+        setError(error.message);
       }
-    });
-    
-    if (!res.ok) {
-      const errorData = await res.json();
-      // Handle specific visibility errors
-      if (errorData.error === 'Profile is private') {
-        setError('This profile is private');
-      } else {
-        throw new Error(errorData.error || 'Failed to fetch posts');
+    };
+
+    const fetchPosts = async () => {
+      try {
+        setLoadingPosts(true);
+        const res = await fetch(`${BACKEND_URL}/api/posts/user/${userId || currentUser._id}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          if (errorData.error === 'Profile is private') {
+            setError('This profile is private');
+          } else {
+            throw new Error(errorData.error || 'Failed to fetch posts');
+          }
+          return;
+        }
+
+        const data = await res.json();
+        setPosts(data.posts);
+      } catch (error) {
+        console.error('Error fetching posts:', error);
+        setError(error.message);
+      } finally {
+        setLoadingPosts(false);
       }
-      return;
-    }
-    
-    const data = await res.json();
-    setPosts(data.posts);
-  } catch (error) {
-    console.error('Error fetching posts:', error);
-    setError(error.message);
-  } finally {
-    setLoadingPosts(false);
-  }
-};
-    
+    };
+
     if (!authLoading && currentUser) {
+      fetchUserProfile();
       fetchPosts();
     }
-  }, [currentUser?._id, authLoading, checkAuth]);
+  }, [userId, currentUser, authLoading, checkAuth]);
 
   const handleSaveProfile = async (updatedData) => {
     try {
-      // If there's a new profile image, it's already been uploaded and the path is in updatedData
       const res = await fetch(`${BACKEND_URL}/api/users/update`, {
         method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(updatedData),
       });
-  
+
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to update profile');
       }
-  
-      // Refresh auth state to get updated user data including new profile photo
-      await checkAuth();
+
+      await checkAuth(); // Refresh auth state to get updated user data
       setEditOpen(false);
     } catch (error) {
       console.error('Profile update error:', error);
@@ -92,7 +108,7 @@ const fetchPosts = async () => {
   if (!currentUser) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
-        <Typography>Please login to view your profile</Typography>
+        <Typography>Please login to view profiles</Typography>
       </Box>
     );
   }
@@ -101,6 +117,14 @@ const fetchPosts = async () => {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
         <Typography color="error">{error}</Typography>
+      </Box>
+    );
+  }
+
+  if (!userProfile) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
+        <Typography>Loading profile...</Typography>
       </Box>
     );
   }
@@ -123,7 +147,7 @@ const fetchPosts = async () => {
         overflow: 'hidden'
       }}>
         <ProfileHeader 
-          user={currentUser} 
+          user={userProfile} 
           onEditClick={() => setEditOpen(true)} 
         />
 
@@ -163,7 +187,7 @@ const fetchPosts = async () => {
         <EditProfileDialog
           open={editOpen}
           onClose={() => setEditOpen(false)}
-          user={currentUser}
+          user={userProfile}
           onSave={handleSaveProfile}
         />
       </Paper>

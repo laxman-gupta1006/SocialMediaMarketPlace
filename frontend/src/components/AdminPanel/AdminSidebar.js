@@ -25,10 +25,6 @@ const sidebarItems = [
   { text: 'Users', icon: <People />, path: '/admin/users' },
   { text: 'Content', icon: <PostAdd />, path: '/admin/content' },
   { text: 'Marketplace', icon: <Store />, path: '/admin/marketplace' },
-  { text: 'Analytics', icon: <Timeline />, path: '/admin/analytics' },
-  { text: 'Reports', icon: <Report />, path: '/admin/reports' },
-  { text: 'Settings', icon: <Settings />, path: '/admin/settings' },
-  { text: 'Notifications', icon: <Settings />, path: '/admin/notifications' },
   { text: 'Audit', icon: <Settings />, path: '/admin/audit' },
 ];
 
