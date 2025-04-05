@@ -95,13 +95,13 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual fields for counts
+// ✅ Safe virtuals with undefined check
 userSchema.virtual('followersCount').get(function() {
-  return this.followers.length;
+  return Array.isArray(this.followers) ? this.followers.length : 0;
 });
 
 userSchema.virtual('followingCount').get(function() {
-  return this.following.length;
+  return Array.isArray(this.following) ? this.following.length : 0;
 });
 
 // Hash password before saving

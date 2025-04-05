@@ -171,11 +171,14 @@ router.get("/get-chat-id", authMiddleware, async (req, res) => {
 });
 
 // ✅ Get messages for a specific chat ID
+// ✅ Get messages for a specific chat ID
 router.get("/get-messages", authMiddleware, async (req, res) => {
   try {
     const { chatId } = req.query;
 
-    const messages = await Message.find({ chatId }).sort({ timestamp: 1 });
+    const messages = await Message.find({ chatId })
+      .sort({ timestamp: 1 })
+      .populate("sender", "username profileImage"); // 🔥 Add this line
 
     res.json({ messages });
   } catch (error) {
@@ -183,6 +186,7 @@ router.get("/get-messages", authMiddleware, async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // ✅ Send a new message (Supports text & image uploads)
 router.post("/send-message", authMiddleware, upload.single("image"), async (req, res) => {
@@ -221,6 +225,52 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
+router.post("/addgroup", authMiddleware, async (req, res) => {
+  try {
+    const { groupName, participantIds } = req.body;
+    const creatorId = req.userId;
+
+    console.log("📥 Received group creation request:");
+    console.log("👤 Creator ID:", creatorId);
+    console.log("🧑‍🤝‍🧑 Participant IDs:", participantIds);
+    console.log("📛 Group Name:", groupName);
+
+    if (!groupName || !Array.isArray(participantIds) || participantIds.length === 0) {
+      return res.status(400).json({ error: "Group name and participants are required" });
+    }
+
+    // Combine all unique participants including the creator
+    const allParticipants = Array.from(new Set([...participantIds, creatorId]));
+
+    // Convert all to ObjectId
+    const participantObjectIds = allParticipants.map(id => new mongoose.Types.ObjectId(id));
+
+    // Create the group chat document
+    const newGroupChat = await Chat.create({
+      name: groupName,
+      participants: participantObjectIds,
+      isGroup: true
+    });
+
+    // ✅ Respond to frontend
+    res.status(201).json({
+      success: true,
+      chat: newGroupChat,
+      received: {
+        creatorId,
+        participantIds,
+        groupName
+      }
+    });
+  } catch (error) {
+    console.error("❌ Error creating group:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
 
 
 // ✅ Export the router

@@ -1,24 +1,32 @@
+import React, { useRef } from 'react';
 import { Box, TextField, IconButton, InputAdornment } from '@mui/material';
 import { Send, AttachFile, Mood, Mic } from '@mui/icons-material';
 
 const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
-  
-  // ✅ Handle File Upload
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (e) => {
+    const file = e.target?.files?.[0];
+
     if (!file) {
       console.error("❌ No file selected");
       return;
     }
-  
-    if (onFileUpload) {
-      console.log("✅ File selected:", file);
-      onFileUpload(file);  // ✅ Pass file, not event
-    } else {
-      console.error("❌ Error: onFileUpload function is not defined!");
+
+    if (!file.type.startsWith("image/")) {
+      console.error("❌ Only image files are allowed");
+      return;
     }
+
+    console.log("✅ File selected:", file);
+
+    if (onFileUpload) {
+      onFileUpload({ file, type: 'picture' });
+    }
+
+    // Optional: Clear file input to allow re-upload of same file
+    e.target.value = '';
   };
-  
 
   return (
     <Box sx={{ display: 'flex', gap: 1, p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
@@ -26,13 +34,14 @@ const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
         <Mood />
       </IconButton>
 
-      {/* ✅ Single file upload button */}
       <IconButton component="label">
         <AttachFile />
-        <input 
-          type="file" 
-          hidden 
-          onChange={handleFileChange} 
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleFileChange}
         />
       </IconButton>
 
@@ -42,6 +51,12 @@ const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
         placeholder="Type a message..."
         value={value}
         onChange={onChange}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            onSend();
+          }
+        }}
         InputProps={{
           endAdornment: (
             <InputAdornment position="end">

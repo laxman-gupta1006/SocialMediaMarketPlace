@@ -1,3 +1,4 @@
+
 const express = require('express');
 const https = require('https');
 const fs = require('fs');
@@ -9,6 +10,8 @@ const marketplaceRoutes = require('./routes/marketplace');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 require('./config/dbConfig');
+require('dotenv').config();
+
 
 
 const messagesRoutes = require('./routes/messages'); // Import messages routes [for routing messages added by deepankar]
