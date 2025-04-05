@@ -43,6 +43,29 @@ const MessagesPage = () => {
 
     socket.current.on('newMessage', (chatId) => {
       if (selectedChat?.chatId === chatId) {
+        const fetchAndUpdateMessages = () => {
+          fetch(`https://localhost:3000/api/messages/get-messages?chatId=${chatId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.messages) {
+                setSelectedChat(prev => ({
+                  ...prev,
+                  messages: data.messages
+                }));
+    
+                setTimeout(() => {
+                  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }
+            })
+            .catch(err => console.error('Error fetching updated messages:', err));
+        };
+    
+        // 💡 Add delay only if last message is an image
         fetch(`https://localhost:3000/api/messages/get-messages?chatId=${chatId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -50,20 +73,17 @@ const MessagesPage = () => {
         })
           .then(res => res.json())
           .then(data => {
-            if (data.messages) {
-              setSelectedChat(prev => ({
-                ...prev,
-                messages: data.messages
-              }));
+            const lastMsg = data.messages?.[data.messages.length - 1];
+            const isImage = lastMsg?.type === 'picture';
     
-              setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-              }, 100);
-            }
+            const delay = isImage ? 1000 : 0; // ⏳ 1 second delay for image
+    
+            setTimeout(fetchAndUpdateMessages, delay);
           })
-          .catch(err => console.error('Error fetching updated messages:', err));
+          .catch(err => console.error('Error pre-checking message type:', err));
       }
     });
+    
     
     
 
@@ -183,11 +203,11 @@ const MessagesPage = () => {
 
   const handleFileUpload = ({ file }) => {
     if (!file || !selectedChat?.chatId) return;
-
+  
     const formData = new FormData();
     formData.append('image', file);
     formData.append('chatId', selectedChat.chatId);
-
+  
     fetch('https://localhost:3000/api/messages/send-message', {
       method: 'POST',
       credentials: 'include',
@@ -200,10 +220,14 @@ const MessagesPage = () => {
             ...prev,
             messages: [...prev.messages, data.newMessage]
           }));
+  
+          // 🔥 Add this to notify others
+          socket.current.emit('newMessage', selectedChat.chatId);
         }
       })
       .catch(err => console.error('Error sending file:', err));
   };
+  
 
   const handleCreateGroup = () => {
     if (!groupName.trim()) return setGroupError('Group name is required.');
