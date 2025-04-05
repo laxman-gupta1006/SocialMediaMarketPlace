@@ -30,11 +30,11 @@ const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
 
   return (
     <Box sx={{ display: 'flex', gap: 1, p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-      <IconButton>
+      {/* <IconButton>
         <Mood />
-      </IconButton>
+      </IconButton> */}
 
-      <IconButton component="label">
+      {/* <IconButton component="label">
         <AttachFile />
         <input
           ref={fileInputRef}
@@ -43,7 +43,7 @@ const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
           hidden
           onChange={handleFileChange}
         />
-      </IconButton>
+      </IconButton> */}
 
       <TextField
         fullWidth
@@ -68,9 +68,9 @@ const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
         }}
       />
 
-      <IconButton>
+      {/* <IconButton>
         <Mic />
-      </IconButton>
+      </IconButton> */}
     </Box>
   );
 };
