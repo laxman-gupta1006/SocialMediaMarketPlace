@@ -14,6 +14,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import Logo from '../Logo';
 import axios from 'axios';
+import VirtualKeyboard from './VirtualKeyboard';
 
 const steps = ['Enter Email', 'Reset Password'];
 
@@ -59,6 +60,20 @@ const ForgotPassword = () => {
     }
   };
 
+  // Virtual keyboard handler for OTP input
+  const handleVirtualKeyPress = (key) => {
+    if (key === 'Clear') {
+      setOtp('');
+    } else if (key === 'Backspace') {
+      setOtp(prev => prev.slice(0, -1));
+    } else {
+      // Append key if OTP length is less than 6 (for example)
+      if (otp.length < 6) {
+        setOtp(prev => prev + key);
+      }
+    }
+  };
+
   return (
     <Container maxWidth="xs" sx={{ height: '100vh', display: 'flex', alignItems: 'center' }}>
       <Box sx={{ width: '100%', textAlign: 'center' }}>
@@ -74,6 +89,7 @@ const ForgotPassword = () => {
 
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
+          {loading && <LinearProgress sx={{ mb: 2 }} />}
 
           {activeStep === 0 ? (
             <>
@@ -95,20 +111,23 @@ const ForgotPassword = () => {
             </>
           ) : (
             <>
+              {/* OTP Input Field: readOnly to disable physical keyboard */}
               <TextField
                 fullWidth
                 label="OTP"
                 value={otp}
-                onChange={(e) => setOtp(e.target.value)}
+                InputProps={{ readOnly: true }}
                 sx={{ mb: 2 }}
               />
+              {/* Render the Virtual Keyboard */}
+              <VirtualKeyboard onKeyPress={handleVirtualKeyPress} />
               <TextField
                 fullWidth
                 label="New Password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                sx={{ mb: 2 }}
+                sx={{ mb: 2, mt: 2 }}
               />
               <Button
                 fullWidth

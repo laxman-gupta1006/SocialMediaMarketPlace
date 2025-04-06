@@ -43,7 +43,7 @@ const PurchasedItems = () => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={purchase.product.images[0]}
+                  image={"https://192.168.2.250:3000/"+purchase.product.images[0]}
                   alt={purchase.product.title}
                 />
                 <CardContent>

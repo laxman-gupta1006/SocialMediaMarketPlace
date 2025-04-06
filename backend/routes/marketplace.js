@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
 const Product = require('../models/Product'); // Critical import
 const Purchase=require('../models/Purchase');
+const User = require('../models/User')
 const requireAdminVerified = require('../middleware/requireAdminVerified');
 // Configure secure file uploads
 const storage = multer.diskStorage({
@@ -51,7 +52,9 @@ router.post('/AddProduct', auth,requireAdminVerified, upload.array('images', 5),
     // Validate required fields
     const requiredFields = ['title', 'description', 'price', 'category', 'location', 'condition'];
     const missingFields = requiredFields.filter(field => !req.body[field]);
-    
+    const owner = await User.findById(req.userId);
+    if (!owner) return res.status(404).json({ error: 'User not found' });
+
     if (missingFields.length > 0) {
       return res.status(400).json({ 
         error: `Missing required fields: ${missingFields.join(', ')}` 
@@ -73,6 +76,7 @@ router.post('/AddProduct', auth,requireAdminVerified, upload.array('images', 5),
       category: req.body.category,
       location: req.body.location.trim(),
       condition: req.body.condition,
+      ownerUsername: owner.username,
       images: req.files.map(file => 
         path.join('uploads', 'marketplace', file.filename)
       )
@@ -116,7 +120,7 @@ router.post('/AddProduct', auth,requireAdminVerified, upload.array('images', 5),
 });
 
 // routes/products.js
-router.get('/search', async (req, res) => {
+router.get('/search', auth, requireAdminVerified, async (req, res) => {
   try {
     // Parse query parameters with validation
     const { 
@@ -215,8 +219,7 @@ const processedProducts = products.map(product => ({
   }
 });
 
-
-router.post('/purchase/:productId', auth,requireAdminVerified, async (req, res) => {
+router.post('/purchase/:productId', auth, requireAdminVerified, async (req, res) => {
   try {
     const product = await Product.findById(req.params.productId);
     
@@ -228,26 +231,66 @@ router.post('/purchase/:productId', auth,requireAdminVerified, async (req, res) 
       return res.status(400).json({ error: 'Product is no longer available' });
     }
 
-    // Create purchase record
+    const buyer = await User.findById(req.userId);
+
+    // Create a purchase record with initial status "pending"
     const purchase = new Purchase({
       user: req.userId,
+      buyer: req.userId,
+      buyerUsername: buyer.username,
+      productOwner: product.owner,
+      productOwnerUsername: product.ownerUsername,
       product: product._id,
       paymentMethod: req.body.method,
       paymentDetails: req.body.details,
       amount: product.price,
-      status: 'completed' // Auto-approve for demo
+      status: 'pending'
     });
 
     await purchase.save();
 
-    // Update product status
-    product.status = 'sold';
-    await product.save();
+    // Simulate asynchronous payment processing (e.g., with a 2-second delay)
+    setTimeout(async () => {
+      // Simulate a success/failure result (e.g., 90% chance of success)
+      const paymentSuccess = Math.random() < 0.9;
+      
+      purchase.status = paymentSuccess ? 'completed' : 'failed';
+      await purchase.save();
 
-    res.json({ message: 'Purchase completed successfully' });
+      if (paymentSuccess) {
+        // Update product status only if payment succeeds
+        product.status = 'sold';
+        await product.save();
+        console.log(`Payment completed for purchase ${purchase._id}`);
+      } else {
+        console.log(`Payment failed for purchase ${purchase._id}`);
+      }
+      // You can also notify the user about the payment result (via email, websocket, etc.)
+    }, 2000); // 2000 ms delay to mimic payment processing time
+
+    // Respond immediately to the client that the payment is being processed
+    res.json({ message: 'Payment processing initiated', purchaseId: purchase._id });
   } catch (error) {
     console.error('Purchase error:', error);
     res.status(500).json({ error: 'Failed to process payment' });
+  }
+});
+
+// Backend route for status checking
+router.get('/purchase/status/:purchaseId', auth, async (req, res) => {
+  try {
+    const purchase = await Purchase.findById(req.params.purchaseId)
+      .populate('product', 'status');
+    
+    if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
+    if (purchase.user.toString() !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
+
+    res.json({ 
+      status: purchase.status,
+      productStatus: purchase.product.status 
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve purchase status' });
   }
 });
 
@@ -255,7 +298,7 @@ router.post('/purchase/:productId', auth,requireAdminVerified, async (req, res) 
 // Add these new routes
 
 // Get user's purchases
-router.get('/purchases', auth,requireAdminVerified, async (req, res) => {
+router.get('/purchases', auth, requireAdminVerified, async (req, res) => {
   try {
     const purchases = await Purchase.find({ user: req.userId })
       .populate({
@@ -272,7 +315,7 @@ router.get('/purchases', auth,requireAdminVerified, async (req, res) => {
 });
 
 // Get user's listings
-router.get('/my-listings', auth, async (req, res) => {
+router.get('/my-listings', auth, requireAdminVerified, async (req, res) => {
   try {
     const listings = await Product.find({ owner: req.userId })
       .populate('owner', 'username')

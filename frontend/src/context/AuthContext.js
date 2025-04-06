@@ -10,6 +10,7 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   console.debug('[AuthProvider] Initializing', { user, loading });
@@ -46,9 +47,30 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-// Update login function to handle immediate user state
-const login = async (formData) => {
+
+const login = async (formData = null) => {
+  console.debug('[login] Login function called with data:', formData ? '(data provided)' : '(no data - post OTP)');
   try {
+    // If no formData is provided, we're in the post-OTP verification flow
+    if (!formData) {
+      console.debug('[login] No form data provided, checking auth after OTP verification');
+      const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
+        credentials: 'include'
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to verify authentication after OTP');
+      }
+      
+      const userData = await res.json();
+      setUser(userData);
+      console.debug('[login] OTP verification successful, user data fetched:', userData);
+      navigate('/');
+      return { success: true };
+    }
+
+    // Normal login flow with credentials
+    console.debug('[login] Attempting login with credentials');
     const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,27 +78,35 @@ const login = async (formData) => {
       credentials: 'include'
     });
 
+    const data = await res.json();
+    
     if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error);
+      throw new Error(data.error || 'Login failed');
     }
 
-    // Immediately check auth status after login
-    const userRes = await fetch(`${BACKEND_URL}/api/auth/me`, {
-      credentials: 'include'
-    });
-    const userData = await userRes.json();
-    setUser(userData);
+    // If OTP is required, return the data without setting user or navigating
+    if (res.status === 202) {
+      console.debug('[login] OTP required, returning response data');
+      return data;
+    }
+
+    // For successful non-OTP login, set user and navigate
+    console.debug('[login] Login successful without OTP, checking auth status');
+    await checkAuth();
     navigate('/');
+    return data;
   } catch (error) {
-    throw error;
+    console.error('[login] Login failed:', error);
+    if (!error.response) {
+      setError({ code: 'BACKEND_DOWN', message: 'Server unavailable' });
+    }
   }
 };
 
   const signup = async (formData) => {
     console.debug('[signup] Attempting signup with data:', {
       email: formData.email,
-      username: formData.username,
+      username: formData.username,  
       // Password intentionally omitted from logs
     });
 
@@ -127,7 +157,7 @@ const login = async (formData) => {
   console.debug('[AuthProvider] Render state:', { user, loading });
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout ,checkAuth }}>
+    <AuthContext.Provider value={{ error ,user, loading, login, signup, logout, checkAuth }}>
       {!loading ? (
         <>
           {console.debug('[AuthProvider] Rendering children')}

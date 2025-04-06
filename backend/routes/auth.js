@@ -58,14 +58,129 @@ router.post(
     }
   }
 );
+ // Login route with rate limiting and input validation
+// router.post(
+//   '/login',
+//   authLimiter,
+//   [
+//     body('username').notEmpty().withMessage('Username or Email is required'),
+//     body('password').notEmpty().withMessage('Password is required')
+//   ],
+//   async (req, res) => {
+//     const errors = validationResult(req);
+//     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-// Login route with rate limiting and input validation
+//     try {
+//       const { username, password } = req.body;
+
+//       const user = await User.findOne({
+//         $or: [{ username }, { email: username }]
+//       });
+//       console.log("username input:", username);
+// console.log("User found:", user);
+// if (user) {
+//   console.log("Stored hash:", user.password);
+//   console.log("Input password:", password);
+//   const match = await bcrypt.compare(password, user.password);
+//   console.log("Password match:", match);
+// }
+//       if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+//       const isMatch = await bcrypt.compare(password, user.password);
+//       if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+
+//       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+//       res.cookie('token', token, {
+//         httpOnly: true,
+//         secure: process.env.NODE_ENV === 'production',
+//         sameSite: 'strict',
+//         maxAge: 604800000
+//       });
+
+//       res.json({ message: 'Logged in successfully' });
+//     } catch (error) {
+//       console.error(error);
+//       res.status(500).json({ error: 'Server error' });
+//     }
+//   }
+// );
+
+// Add to auth routes
+router.post(
+  '/verify-2fa',
+  authLimiter,
+  [
+    body('username').notEmpty(),
+    body('otp').isLength(6)
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const { username, otp } = req.body;
+      
+      const user = await User.findOne({
+        $or: [{ username }, { email: username }]
+      }).select('+verification.twoFactorEnabled');
+
+      if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+      if (!user.verification.twoFactorEnabled) {
+        return res.status(400).json({ error: '2FA not enabled for this account' });
+      }
+
+      const otpRecord = await OTPVerification.findOne({
+        email: user.email,
+        otp,
+        purpose: '2fa'
+      });
+
+      if (!otpRecord || otpRecord.expiresAt < new Date()) {
+        return res.status(400).json({ error: 'Invalid or expired OTP' });
+      }
+
+      // Generate final token
+      const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      
+      // Set cookie and cleanup OTP
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 604800000
+      });
+
+      await OTPVerification.deleteOne({ _id: otpRecord._id });
+      
+      // // Update login history
+      // await User.findByIdAndUpdate(user._id, {
+      //   $push: {
+      //     loginHistory: {
+      //       ip: req.ip,
+      //       device: req.headers['user-agent'],
+      //       location: req.geo.location,
+      //       timestamp: new Date()
+      //     }
+      //   },
+      //   lastActive: new Date()
+      // });
+
+      res.json({ message: 'Login successful' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+// Modified login route
 router.post(
   '/login',
   authLimiter,
   [
-    body('username').notEmpty().withMessage('Username or Email is required'),
-    body('password').notEmpty().withMessage('Password is required')
+    body('username').notEmpty(),
+    body('password').notEmpty()
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -73,23 +188,51 @@ router.post(
 
     try {
       const { username, password } = req.body;
-
       const user = await User.findOne({
         $or: [{ username }, { email: username }]
-      });
-      console.log("username input:", username);
-console.log("User found:", user);
-if (user) {
-  console.log("Stored hash:", user.password);
-  console.log("Input password:", password);
-  const match = await bcrypt.compare(password, user.password);
-  console.log("Password match:", match);
-}
+      }).select('+password +verification.twoFactorEnabled');
+
       if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+      if (user.status !== 'active') return res.status(403).json({ error: 'Account suspended' });
 
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 
+      // Check if 2FA is enabled
+      if (user.verification.twoFactorEnabled) {
+        const otp = generateOTP();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        await OTPVerification.create({
+          email: user.email,
+          otp,
+          expiresAt,
+          purpose: '2fa'
+        });
+
+        // Send OTP email
+        const transporter = nodemailer.createTransport({
+          host: process.env.EMAIL_HOST,
+          port: process.env.EMAIL_PORT,
+          secure: process.env.EMAIL_SECURE === 'true',
+          auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+        });
+
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: user.email,
+          subject: 'Your 2FA Verification Code',
+          text: `Your verification code is: ${otp}`
+        });
+
+        return res.status(202).json({ 
+          message: '2FA required', 
+          otpRequired: true,
+          email: user.email.slice(0, 3) + '***' + user.email.split('@')[1]
+        });
+      }
+
+      // Regular login flow
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
       res.cookie('token', token, {

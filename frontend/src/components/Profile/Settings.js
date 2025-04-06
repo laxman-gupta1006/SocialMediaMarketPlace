@@ -30,6 +30,7 @@ const Settings = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [profileVisibility, setProfileVisibility] = useState(user?.privacySettings?.profileVisibility || 'public');
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(user?.verification?.twoFactorEnabled || false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -57,6 +58,34 @@ const Settings = () => {
       setProfileVisibility(newVisibility);
     } catch (err) {
       console.error('Visibility update error:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTwoFactorToggle = async () => {
+    const newStatus = !twoFactorEnabled;
+    setLoading(true);
+    setError('');
+    
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/users/two-factor`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ twoFactorEnabled: newStatus })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to update two-factor setting');
+      }
+      setTwoFactorEnabled(newStatus);
+    } catch (err) {
+      console.error('Two-factor update error:', err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -100,6 +129,7 @@ const Settings = () => {
                 Privacy & Security
               </Typography>
               
+              {/* Profile Visibility Switch */}
               <FormControlLabel
                 control={
                   <Switch
@@ -116,6 +146,29 @@ const Settings = () => {
                       {profileVisibility === 'private' 
                         ? 'Your profile is currently private' 
                         : 'Your profile is currently public'}
+                    </Typography>
+                  </Box>
+                }
+                sx={{ alignItems: 'flex-start', mb: 2 }}
+              />
+
+              {/* Two-Factor Authentication Switch */}
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={twoFactorEnabled}
+                    onChange={handleTwoFactorToggle}
+                    disabled={loading}
+                    color="primary"
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography>Two-Factor Authentication</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {twoFactorEnabled 
+                        ? 'Two-factor authentication is enabled' 
+                        : 'Two-factor authentication is disabled'}
                     </Typography>
                   </Box>
                 }

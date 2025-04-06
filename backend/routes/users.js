@@ -433,5 +433,34 @@ router.get('/admin-notes', authMiddleware, async (req, res) => {
   }
 });
 
+// Two-Factor Authentication Update Route
+router.put('/two-factor', authMiddleware, async (req, res) => {
+  try {
+    const { twoFactorEnabled } = req.body;
+    if (typeof twoFactorEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'Invalid twoFactorEnabled value' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { 'verification.twoFactorEnabled': twoFactorEnabled },
+      { new: true, runValidators: true, select: '-password -__v -refreshTokens' }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Two-factor authentication setting updated successfully',
+      twoFactorEnabled: user.verification.twoFactorEnabled
+    });
+  } catch (error) {
+    console.error('Two-Factor update error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 
 module.exports = router;

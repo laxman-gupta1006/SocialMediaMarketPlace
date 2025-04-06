@@ -42,7 +42,7 @@ const ListedItems = () => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={product.images[0]}
+                  image={"https://192.168.2.250:3000/"+product.images[0]}
                   alt={product.title}
                 />
                 <CardContent>

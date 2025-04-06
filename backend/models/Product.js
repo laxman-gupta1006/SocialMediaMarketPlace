@@ -10,6 +10,10 @@ const productSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  ownerUsername: {
+    type: String,
+    required: true
+  },
   title: {
     type: String,
     required: true,

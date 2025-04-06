@@ -153,7 +153,7 @@ const ProductCard = ({ product, onBuy }) => {
               {product.price} ETH
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {product.owner?.username || 'Unknown Seller'}
+                   {product.ownerUsername || 'Unknown Seller'}
             </Typography>
           </Box>
         </Box>

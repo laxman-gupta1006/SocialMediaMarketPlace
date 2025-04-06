@@ -28,6 +28,24 @@ const purchaseSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'completed', 'failed'],
     default: 'pending'
+  },
+  buyer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  buyerUsername: {
+    type: String,
+    required: true
+  },
+  productOwner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  productOwnerUsername: {
+    type: String,
+    required: true
   }
 }, { timestamps: true });
 

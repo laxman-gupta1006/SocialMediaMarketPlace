@@ -15,6 +15,9 @@ import AdminRouter from './components/AdminPanel/AdminRouter';
 import { useAuth } from './context/AuthContext';
 import Loading from './components/Loading';
 import ForgotPassword from './components/auth/ForgotPassword';
+import { ServerDownPage } from './components/ErrorPages/ServerDownPage';
+import { NotFoundPage } from './components/ErrorPages/NotFoundPage';
+import { UnauthorizedPage } from './components/ErrorPages/UnauthorizedPage';
 
 const theme = createTheme({
   components: {
@@ -43,7 +46,7 @@ const ProtectedRoute = ({ children }) => {
 // AdminRoute ensures the user has admin role.
 const AdminRoute = ({ children }) => {
   const { user } = useAuth();
-  return user?.roles?.includes('admin') ? children : <Navigate to="/" replace />;
+  return user?.roles?.includes('admin') ? children : <UnauthorizedPage />;
 };
 
 // VerifiedRoute ensures the feature is only available for verified users.
@@ -62,9 +65,18 @@ const VerifiedRoute = ({ children }) => {
 };
 
 const App = () => {
-  const { user, loading } = useAuth();
+  const { user, loading , error } = useAuth();
 
   if (loading) return <Loading />;
+
+  if (error?.code === 'BACKEND_DOWN') {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <ServerDownPage />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider theme={theme}>
@@ -101,6 +113,7 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <MainPage />
+                <Navigation />
               </ProtectedRoute>
             }
           />
@@ -109,6 +122,7 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+                <Navigation />
               </ProtectedRoute>
             }
           />
@@ -117,6 +131,7 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <NewPostPage />
+                <Navigation />
               </ProtectedRoute>
             }
           />
@@ -126,6 +141,7 @@ const App = () => {
               <ProtectedRoute>
                 <VerifiedRoute>
                   <MessagesPage />
+                  <Navigation />
                 </VerifiedRoute>
               </ProtectedRoute>
             }
@@ -135,6 +151,7 @@ const App = () => {
             element={
               <ProtectedRoute>
                 <SearchPage />
+                <Navigation />
               </ProtectedRoute>
             }
           />
@@ -144,15 +161,15 @@ const App = () => {
               <ProtectedRoute>
                 <VerifiedRoute>
                   <MarketplacePage />
+                  <Navigation />
                 </VerifiedRoute>
               </ProtectedRoute>
             }
           />
-              
+          <Route path="/error/server-down" element={<ServerDownPage />} />
           {/* Fallback Route */}
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
-        <Navigation />
       </Box>
     </ThemeProvider>
   );
