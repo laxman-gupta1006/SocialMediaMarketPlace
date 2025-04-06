@@ -194,7 +194,7 @@ router.post(
 
       if (!user) return res.status(401).json({ error: 'Invalid credentials' });
       if (user.status !== 'active') return res.status(403).json({ error: 'Account suspended' });
-
+      
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
 

@@ -238,7 +238,6 @@ router.get('/search', authMiddleware, async (req, res) => {
     if (!query || query.trim().length < 2) {
       return res.status(400).json({ error: 'Search query must be at least 2 characters' });
     }
-    
 
     const currentUser = await User.findById(req.userId);
     if (!currentUser) {
@@ -250,27 +249,33 @@ router.get('/search', authMiddleware, async (req, res) => {
         { username: { $regex: query, $options: 'i' } },
         { fullName: { $regex: query, $options: 'i' } }
       ],
-      _id: { $ne: req.userId },
-      $or: [
-        { 'privacySettings.profileVisibility': 'public' },
-        {
-          'privacySettings.profileVisibility': 'private',
-          _id: { $in: currentUser.following }
-        }
-      ]
+      _id: { $ne: req.userId }
     })
     .select('username fullName profileImage privacySettings followers following')
     .limit(20)
     .lean();
 
-    const resultsWithStatus = searchResults.map(user => ({
-      ...user,
-      isFollowing: currentUser.following.some(
-        followingUser => followingUser.userId && followingUser.userId.toString() === user._id.toString()
-      ),      
-      followersCount: user.followers.length,
-      isPrivate: user.privacySettings?.profileVisibility === 'private'
-    }));
+    const resultsWithStatus = searchResults.map(user => {
+      const isFollowing = currentUser.following.some(
+        u => u.userId?.toString() === user._id.toString()
+      );
+
+      const isPrivate = user.privacySettings?.profileVisibility === 'private';
+      const redacted = isPrivate && !isFollowing;
+
+      return {
+        _id: user._id,
+        username: user.username, // Keep username always visible for follow actions
+        fullName: redacted ? 'Private Account' : user.fullName,
+        profileImage: redacted
+          ? '/default-private.png'
+          : (user.profileImage ? `https://192.168.2.250:3000${user.profileImage}` : '/default-profile.png'),
+        followersCount: user.followers.length,
+        isPrivate,
+        isFollowing,
+        canFollow: true // explicitly say this account can be followed
+      };
+    });
 
     res.json(resultsWithStatus);
   } catch (error) {
@@ -278,6 +283,8 @@ router.get('/search', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+
 // Updated follow route with error handling
 router.post('/follow/:userId', authMiddleware, async (req, res) => {
   try {

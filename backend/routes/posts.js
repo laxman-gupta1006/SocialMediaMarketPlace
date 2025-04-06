@@ -182,47 +182,38 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
     const userId = req.params.userId;
     const currentUserId = req.userId;
-    const page = 1;
-    const limit = 10;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
 
     console.log("Incoming User ID:", userId);
     console.log("Current User ID:", currentUserId);
 
-    // Validate user ID format MORE ROBUSTLY
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
-    // Explicitly convert to ObjectId
-    const userObjectId = mongoose.Types.ObjectId.createFromHexString(userId);
-    const currentUserObjectId = mongoose.Types.ObjectId.createFromHexString(currentUserId);
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const currentUserObjectId = new mongoose.Types.ObjectId(currentUserId);
 
-    // Find the target user first to ensure they exist
-    const targetUser = await User.findById(userObjectId);
+    const targetUser = await User.findById(userObjectId).lean();
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check following status
-    const isFollowing = await User.findOne({
-      _id: userObjectId,
-      followers: currentUserObjectId
-    });
-
     const isOwner = userObjectId.equals(currentUserObjectId);
+    const isFollowing = targetUser.followers.some(f => f.userId.equals(currentUserObjectId));
 
-    // Construct query with explicit ObjectId comparison
+    // 🧠 Visibility logic
+    let visibilityFilter = { visibility: 'public' };
+    if (isOwner) {
+      visibilityFilter = {}; // All posts
+    } else if (isFollowing) {
+      visibilityFilter = { visibility: { $in: ['public', 'followers'] } };
+    }
+
     const postQuery = {
       userId: userObjectId,
-      $or: [
-        { visibility: 'public' },
-        ...(isOwner ? [{ visibility: 'private' }] : []),
-        ...(isOwner || isFollowing ? [{ visibility: 'followers' }] : []),
-        { 
-          visibility: 'private',
-          authorizedUsers: { $in: [currentUserObjectId] }
-        }
-      ]
+      ...visibilityFilter
     };
 
     console.log("Post Query:", JSON.stringify(postQuery, null, 2));
@@ -230,7 +221,7 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
     const posts = await Post.find(postQuery)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(parseInt(limit))
+      .limit(limit)
       .populate({
         path: 'userId',
         select: 'username profileImage'
@@ -239,12 +230,11 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
 
     console.log("Found Posts:", posts.length);
 
-    // Robust formatting with extensive error handling
     const formattedPosts = posts.map(post => {
       try {
         return {
-          _id: post._id ? post._id.toString() : null,
-          userId: post.userId?._id ? post.userId._id.toString() : null,
+          _id: post._id?.toString(),
+          userId: post.userId?._id?.toString(),
           username: post.userId?.username || 'Unknown User',
           profileImage: post.userId?.profileImage 
             ? `https://192.168.2.250:3000${post.userId.profileImage}` 
@@ -256,8 +246,8 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
           caption: post.caption || '',
           likes: post.likes || [],
           comments: (post.comments || []).map(comment => ({
-            _id: comment._id ? comment._id.toString() : null,
-            userId: comment.userId ? comment.userId.toString() : null,
+            _id: comment._id?.toString(),
+            userId: comment.userId?.toString(),
             username: comment.username || 'Unknown User',
             profileImage: comment.profileImage 
               ? `https://192.168.2.250:3000${comment.profileImage}` 
@@ -270,15 +260,15 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
           ),
           createdAt: post.createdAt
         };
-      } catch (formatError) {
-        console.error('Post formatting error:', formatError);
+      } catch (err) {
+        console.error('Post formatting error:', err);
         return null;
       }
     }).filter(post => post !== null);
 
-    res.json({ 
+    res.status(200).json({ 
       posts: formattedPosts,
-      total: formattedPosts.length
+      total: formattedPosts.length 
     });
 
   } catch (error) {
@@ -290,6 +280,7 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
     });
   }
 });
+
 // Like/Unlike post
 // Like/Unlike post - Updated version
 router.put('/like/:postId', authMiddleware, async (req, res) => {

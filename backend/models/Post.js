@@ -91,9 +91,24 @@ const postSchema = new mongoose.Schema({
 postSchema.index({ location: '2dsphere' });
 // In models/Post.js
 postSchema.index({ userId: 1 });
-postSchema.index({ createdAt: -1 });
-postSchema.index({ mediaType: 1 });
 postSchema.index({ 'reports.createdAt': -1 });
+
+
+// Add virtuals for better reporting
+postSchema.virtual('reportsCount').get(function() {
+  return this.reports.length;
+});
+
+// Add compound indexes for common queries
+postSchema.index({ 
+  createdAt: -1,
+  reportsCount: -1 
+});
+postSchema.index({
+  mediaType: 1,
+  'reports.reason': 1
+});
+
 
 // Middleware to automatically populate username when saving comments
 postSchema.pre('save', async function(next) {
