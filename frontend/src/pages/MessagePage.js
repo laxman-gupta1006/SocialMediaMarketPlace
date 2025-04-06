@@ -3,8 +3,9 @@ import { io } from 'socket.io-client';
 import {
   Grid, Box, Typography, IconButton, Button, Dialog, DialogTitle, DialogContent,
   DialogActions, TextField, Checkbox, List, ListItem, ListItemAvatar, Avatar,
-  ListItemText, FormControlLabel
+  ListItemText, FormControlLabel, CircularProgress
 } from '@mui/material';
+import forge from 'node-forge';
 import AddIcon from '@mui/icons-material/Add';
 import ConversationList from '../components/messages/CoversationList';
 import ChatHeader from '../components/messages/ChatHeader';
@@ -21,9 +22,84 @@ const MessagesPage = () => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [groupError, setGroupError] = useState('');
+  const [symmetricKey, setSymmetricKey] = useState(null); // Make sure symmetricKey is defined correctly
+  const [privateKey, setPrivateKey] = useState(null);
+  // Add loading state for spinner
+  const [loading, setLoading] = useState(true);
 
   const messagesEndRef = useRef(null);
   const socket = useRef(null);
+
+  const decryptMessage = (encryptedText, ivBase64, symmetricKey) => {
+    try {
+      const iv = forge.util.decode64(ivBase64);
+      const ciphertextBytes = forge.util.decode64(encryptedText);
+  
+      const decipher = forge.cipher.createDecipher('AES-CBC', symmetricKey);
+      decipher.start({ iv });
+      decipher.update(forge.util.createBuffer(ciphertextBytes, 'raw'));
+  
+      const success = decipher.finish();
+      if (success) {
+        const decrypted = decipher.output.toString();
+        console.log("💬 Decrypted Message:", decrypted);
+        return decrypted;
+      } else {
+        console.warn("❌ Failed to decrypt message");
+        return '[Decryption Failed]';
+      }
+    } catch (err) {
+      console.error("⚠️ Decryption error:", err);
+      return '[Error Decrypting]';
+    }
+  };
+
+  // Add loading spinner timer
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 5000); // 5 seconds loading time
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  useEffect(() => {
+    const exchangeKey = async () => {
+      // Generate RSA key pair
+      const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+      const publicKeyPem = forge.pki.publicKeyToPem(keypair.publicKey);
+      const privateKeyPem = forge.pki.privateKeyToPem(keypair.privateKey);
+
+      console.log("🔑 Public Key (PEM):\n", publicKeyPem);
+      console.log("🔒 Private Key (PEM):\n", privateKeyPem);
+
+      const res = await fetch('https://localhost:3000/api/messages/exchange-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ publicKeyPem })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.encryptedSymmetricKey) {
+        console.log("📦 Encrypted Symmetric Key (Base64):", data.encryptedSymmetricKey);
+
+        // Decrypt the symmetric key using private key
+        const encryptedBytes = forge.util.decode64(data.encryptedSymmetricKey);
+        const decryptedSymmetricKey = keypair.privateKey.decrypt(encryptedBytes, 'RSA-OAEP');
+        console.log("🔓 Decrypted Symmetric Key:", decryptedSymmetricKey);
+
+        setSymmetricKey(decryptedSymmetricKey); // Store for later use
+        setPrivateKey(keypair.privateKey);      // Needed for decryption
+      } else {
+        console.error('Key exchange failed:', data.error);
+      }
+    };
+
+    if (currentUserId) {
+      exchangeKey();
+    }
+  }, [currentUserId]);
 
   useEffect(() => {
     fetch('https://localhost:3000/api/auth/me', { credentials: 'include' })
@@ -52,14 +128,15 @@ const MessagesPage = () => {
             .then(res => res.json())
             .then(data => {
               if (data.messages) {
+                const decryptedMessages = data.messages.map(msg => ({
+                  ...msg,
+                  text: msg.type === 'text' && symmetricKey && msg.iv? decryptMessage(msg.text, msg.iv, symmetricKey): msg.text
+                }));
+            
                 setSelectedChat(prev => ({
                   ...prev,
-                  messages: data.messages
+                  messages: decryptedMessages
                 }));
-    
-                setTimeout(() => {
-                  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
               }
             })
             .catch(err => console.error('Error fetching updated messages:', err));
@@ -84,9 +161,6 @@ const MessagesPage = () => {
       }
     });
     
-    
-    
-
     socket.current.on('groupCreated', () => {
       loadConversations();
     });
@@ -145,9 +219,14 @@ const MessagesPage = () => {
       .then(res => res.json())
       .then(data => {
         if (data.messages) {
+          const decryptedMessages = data.messages.map(msg => ({
+            ...msg,
+            text: msg.type === 'text' && symmetricKey && msg.iv? decryptMessage(msg.text, msg.iv, symmetricKey): msg.text
+          }));
+      
           setSelectedChat(prev => ({
             ...prev,
-            messages: data.messages
+            messages: decryptedMessages
           }));
         }
       })
@@ -168,39 +247,62 @@ const MessagesPage = () => {
   }, [selectedChat?.messages]);
 
   const handleSend = async () => {
-    if (!newMessage.trim() || !selectedChat?.chatId) return;
-
+    if (!newMessage.trim() || !selectedChat?.chatId || !symmetricKey) return;
+  
     try {
+      // 1. Generate random IV
+      const iv = forge.random.getBytesSync(16);
+  
+      // 2. Encrypt the message using AES-CBC
+      const cipher = forge.cipher.createCipher('AES-CBC', symmetricKey);
+      cipher.start({ iv });
+      cipher.update(forge.util.createBuffer(newMessage, 'utf8'));
+      cipher.finish();
+      const encrypted = cipher.output.getBytes();
+  
+      // 3. Base64 encode both encrypted message and IV
+      const encryptedBase64 = forge.util.encode64(encrypted);
+      const ivBase64 = forge.util.encode64(iv);
+  
+      // 🟡 LOG EVERYTHING HERE
+      console.log("Original Message:", newMessage);
+      console.log("Encrypted (Base64):", encryptedBase64);
+      console.log("IV (Base64):", ivBase64);
+  
+      // 4. Send encrypted message to server
       const res = await fetch('https://localhost:3000/api/messages/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           chatId: selectedChat.chatId,
-          text: newMessage,
+          text: encryptedBase64,
+          iv: ivBase64,
           type: 'text'
         })
       });
-
+  
       const data = await res.json();
-
+  
       if (res.ok && data.newMessage) {
-        const newMessageObj = data.newMessage;
-
+        const newMessageObj = {
+          ...data.newMessage,
+          text: newMessage // display plain text locally
+        };
+  
         setSelectedChat(prev => ({
           ...prev,
           messages: [...(prev.messages || []), newMessageObj]
         }));
-
+  
         socket.current.emit('newMessage', selectedChat.chatId);
-
         setNewMessage('');
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error encrypting/sending message:', error);
     }
   };
-
+  
   const handleFileUpload = ({ file }) => {
     if (!file || !selectedChat?.chatId) return;
   
@@ -267,6 +369,68 @@ const MessagesPage = () => {
         : [...prev, userId]
     );
   };
+
+  // Render loading overlay when loading is true
+  if (loading) {
+    return (
+      <>
+        {/* Transparent overlay with blur effect */}
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 9999,
+            bgcolor: 'rgba(255, 255, 255, 0.7)',
+            backdropFilter: 'blur(5px)'
+          }}
+        >
+          <Box sx={{ textAlign: 'center' }}>
+            <CircularProgress size={60} thickness={4} />
+            <Typography variant="h6" sx={{ mt: 2 }}>Loading your secure messages...</Typography>
+          </Box>
+        </Box>
+        
+        {/* Background content (blurred) */}
+        <Grid container sx={{ height: '100vh', overflow: 'hidden', filter: 'blur(5px)' }}>
+          <Grid
+            item
+            xs={12}
+            md={4}
+            sx={{
+              borderRight: '1px solid',
+              borderColor: 'divider',
+              height: '100vh',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">Chats</Typography>
+              <IconButton><AddIcon /></IconButton>
+            </Box>
+            <Box sx={{ flex: 1, overflowY: 'auto' }}></Box>
+          </Grid>
+
+          <Grid
+            item
+            xs={12}
+            md={8}
+            sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}
+          >
+            <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <Typography>Select a conversation to start chatting</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+      </>
+    );
+  }
 
   return (
     <Grid container sx={{ height: '100vh', overflow: 'hidden' }}>

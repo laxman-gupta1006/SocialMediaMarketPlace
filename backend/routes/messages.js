@@ -8,9 +8,59 @@ const User = require("../models/User");
 const Chat = require("../models/Chat");
 const Message = require("../models/Message");
 const mongoose = require("mongoose");
+const forge = require("node-forge");
+const crypto = require("crypto");
 
 // ✅ Use getIO from socket.js (not server.js anymore)
 const { getIO } = require("../socket");
+
+const userSymmetricKeys = {}; // { userId: { key: <rawKey>, timestamp: <timestamp> } }
+
+
+router.post("/exchange-key", authMiddleware, (req, res) => {
+  try {
+    const { publicKeyPem } = req.body;
+
+    if (!publicKeyPem) {
+      return res.status(400).json({ error: "Public key is required" });
+    }
+
+    const userId = req.userId;
+    const timestamp = Date.now().toString(); // or use new Date().toISOString()
+
+    // ✅ Generate seed from userId + timestamp
+    const seed = userId + timestamp;
+    const md = forge.md.sha256.create();
+    md.update(seed);
+
+    // ✅ Use SHA-256 hash as a 32-byte symmetric AES key
+    const symmetricKey = md.digest().getBytes(); // 32 bytes for AES-256
+
+    // ✅ Convert frontend's PEM public key to forge publicKey object
+    const publicKey = forge.pki.publicKeyFromPem(publicKeyPem);
+
+    // ✅ Encrypt symmetric key with RSA public key
+    const encryptedSymmetricKey = publicKey.encrypt(symmetricKey, "RSA-OAEP");
+
+    // ✅ Send encrypted key in base64, and also return timestamp so frontend can verify / save if needed
+    const encryptedBase64 = forge.util.encode64(encryptedSymmetricKey);
+
+            // Store the symmetric key in memory using userId
+        userSymmetricKeys[userId] = {
+          key: symmetricKey,
+          timestamp
+        };
+
+
+    res.json({
+      encryptedSymmetricKey: encryptedBase64,
+      seedTimestamp: timestamp // Optional: return timestamp used in generation
+    });
+  } catch (error) {
+    console.error("❌ Error during key exchange:", error);
+    res.status(500).json({ error: "Internal server error during key exchange" });
+  }
+});
 
 // ✅ Configure multer for image uploads
 const storage = multer.diskStorage({
@@ -124,19 +174,44 @@ router.get("/get-chat-id", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ Get messages for a specific chat ID
 router.get("/get-messages", authMiddleware, async (req, res) => {
   try {
     const { chatId } = req.query;
+    const userId = req.userId;
+
+    const userKeyInfo = userSymmetricKeys[userId];
+    if (!userKeyInfo) {
+      return res.status(400).json({ error: "Symmetric key not initialized." });
+    }
+
+    const symmetricKey = userKeyInfo.key;
+
     const messages = await Message.find({ chatId })
       .sort({ timestamp: 1 })
-      .populate("sender", "username profileImage");
-    res.json({ messages });
+      .populate("sender", "username profileImage")
+      .lean();
+
+    const encryptedMessages = messages.map(msg => {
+      const iv = crypto.randomBytes(16); // 16 bytes IV for AES-256-CBC
+      const cipher = crypto.createCipheriv("aes-256-cbc", Buffer.from(symmetricKey, 'binary'), iv);
+      let encrypted = cipher.update(msg.text, "utf8", "base64");
+      encrypted += cipher.final("base64");
+
+      return {
+        ...msg,
+        text: encrypted, // 👈 Encrypted data replaces `text` directly
+        iv: iv.toString("base64") // 🔐 still useful for decryption later
+      };
+    });
+
+    res.json({ messages: encryptedMessages });
+
   } catch (error) {
-    console.error("Error fetching messages:", error);
+    console.error("❌ Error fetching messages:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 // ✅ Send a new message (with socket.io emit)
 // ✅ Send a new message (emit only a signal to refetch)
@@ -144,7 +219,7 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
   try {
     console.log("Received message data:", req.body);
 
-    const { chatId, text, type } = req.body;
+    const { chatId, text, type, iv: ivBase64 } = req.body;
     const sender = req.userId;
 
     if (!chatId) {
@@ -159,13 +234,29 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
     };
 
     if (req.file) {
+      // If it's an image message, just store the file
       messageData.text = `/uploads/posts/${req.file.filename}`;
       messageData.type = "picture";
     } else {
-      if (!text) {
-        return res.status(400).json({ error: "Text message cannot be empty." });
+      if (!text || !ivBase64) {
+        return res.status(400).json({ error: "Encrypted text and IV are required." });
       }
-      messageData.text = text;
+
+      const userKeyInfo = userSymmetricKeys[sender];
+      if (!userKeyInfo) {
+        return res.status(400).json({ error: "Symmetric key not initialized for user." });
+      }
+
+      const symmetricKey = userKeyInfo.key;
+      const iv = Buffer.from(ivBase64, "base64");
+      const encryptedText = text;
+
+      // 🔓 Decrypt text before storing
+      const decipher = crypto.createDecipheriv("aes-256-cbc", Buffer.from(symmetricKey, "binary"), iv);
+      let decrypted = decipher.update(encryptedText, "base64", "utf8");
+      decrypted += decipher.final("utf8");
+
+      messageData.text = decrypted;
     }
 
     const newMessage = await Message.create(messageData);
@@ -176,10 +267,11 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
     res.status(201).json({ success: true, newMessage });
 
   } catch (error) {
-    console.error("Error sending message:", error);
+    console.error("❌ Error sending message:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 
 // ✅ Create a group chat
