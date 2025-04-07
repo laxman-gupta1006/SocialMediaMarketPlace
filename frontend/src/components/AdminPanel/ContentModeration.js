@@ -1,14 +1,14 @@
-// src/components/AdminPanel/ContentModeration.jsx
 import React, { useState, useEffect } from 'react';
-import { 
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
-  Paper, Chip, Button, LinearProgress, Typography, TextField, 
-  Dialog, DialogTitle, DialogContent, DialogActions, Avatar
+import {
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Paper, Chip, Button, LinearProgress, Typography, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions, Avatar,
+  FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import { Delete, Report, CheckCircle, Warning, Close } from '@mui/icons-material';
 import moment from 'moment';
 
-const BACKEND_URL = 'https://localhost:3000';
+const BACKEND_URL = 'https://192.168.2.250:3000';
 
 const ContentModeration = () => {
   const [posts, setPosts] = useState([]);
@@ -17,8 +17,9 @@ const ContentModeration = () => {
   const [error, setError] = useState('');
   const [selectedPost, setSelectedPost] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filters, setFilters] = useState({ mediaType: '', sort: '-createdAt' });
   const [pagination, setPagination] = useState({
-    page: 1,
+    currentPage: 1,
     totalPages: 1,
     limit: 50
   });
@@ -28,8 +29,9 @@ const ContentModeration = () => {
       setLoading(true);
       const params = new URLSearchParams({
         page,
+        limit: pagination.limit,
         search,
-        limit: pagination.limit
+        ...filters
       }).toString();
 
       const response = await fetch(`${BACKEND_URL}/api/admin/posts?${params}`, {
@@ -61,7 +63,7 @@ const ContentModeration = () => {
 
   useEffect(() => {
     fetchPosts();
-  }, [search]);
+  }, [search, filters]);
 
   const handleDeletePost = async (postId) => {
     try {
@@ -100,7 +102,7 @@ const ContentModeration = () => {
         throw new Error(errorData.error || 'Failed to clear reports');
       }
 
-      setPosts(posts.map(post => 
+      setPosts(posts.map(post =>
         post._id === postId ? { ...post, reports: [] } : post
       ));
       setDialogOpen(false);
@@ -113,6 +115,55 @@ const ContentModeration = () => {
     setSelectedPost(post);
     setDialogOpen(true);
   };
+
+  const PaginationControls = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
+      <Button
+        onClick={() => fetchPosts(pagination.currentPage - 1)}
+        disabled={pagination.currentPage === 1}
+      >
+        Previous
+      </Button>
+      <Typography variant="body1" sx={{ mx: 2 }}>
+        Page {pagination.currentPage} of {pagination.totalPages}
+      </Typography>
+      <Button
+        onClick={() => fetchPosts(pagination.currentPage + 1)}
+        disabled={pagination.currentPage >= pagination.totalPages}
+      >
+        Next
+      </Button>
+    </div>
+  );
+
+  const FiltersBar = () => (
+    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+      <FormControl size="small" sx={{ minWidth: 120 }}>
+        <InputLabel>Media Type</InputLabel>
+        <Select
+          value={filters.mediaType}
+          onChange={(e) => setFilters({ ...filters, mediaType: e.target.value })}
+          label="Media Type"
+        >
+          <MenuItem value="">All</MenuItem>
+          <MenuItem value="image">Images</MenuItem>
+          <MenuItem value="video">Videos</MenuItem>
+        </Select>
+      </FormControl>
+      <FormControl size="small" sx={{ minWidth: 120 }}>
+        <InputLabel>Sort By</InputLabel>
+        <Select
+          value={filters.sort}
+          onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
+          label="Sort By"
+        >
+          <MenuItem value="-createdAt">Newest First</MenuItem>
+          <MenuItem value="createdAt">Oldest First</MenuItem>
+          <MenuItem value="-reportsCount">Most Reported</MenuItem>
+        </Select>
+      </FormControl>
+    </div>
+  );
 
   return (
     <>
@@ -127,6 +178,8 @@ const ContentModeration = () => {
         }}
       />
 
+      <FiltersBar />
+
       <TableContainer component={Paper}>
         {loading && <LinearProgress />}
         {error && <Typography color="error" p={2}>{error}</Typography>}
@@ -135,7 +188,7 @@ const ContentModeration = () => {
           <TableHead>
             <TableRow>
               <TableCell>Author</TableCell>
-              <TableCell>Preview</TableCell>
+              <TableCell>Media</TableCell>
               <TableCell>Reports</TableCell>
               <TableCell>Created</TableCell>
               <TableCell>Actions</TableCell>
@@ -151,9 +204,18 @@ const ContentModeration = () => {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Typography variant="body2" noWrap>
-                    {post.caption || 'No caption'}
-                  </Typography>
+                  {post.mediaType === 'image' ? (
+                    <img
+                      src={post.media}
+                      alt="Post media"
+                      style={{ width: 60, height: 60, objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <video
+                      style={{ width: 60, height: 60, objectFit: 'cover' }}
+                      src={post.media}
+                    />
+                  )}
                 </TableCell>
                 <TableCell>
                   <Chip
@@ -196,6 +258,8 @@ const ContentModeration = () => {
         </Table>
       </TableContainer>
 
+      <PaginationControls />
+
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md">
         <DialogTitle>
           Post Details
@@ -214,9 +278,9 @@ const ContentModeration = () => {
               </Typography>
               <div style={{ margin: '20px 0' }}>
                 {selectedPost.mediaType === 'image' ? (
-                  <img 
-                    src={selectedPost.media} 
-                    alt="Post content" 
+                  <img
+                    src={selectedPost.media}
+                    alt="Post content"
                     style={{ maxWidth: '100%', maxHeight: '400px' }}
                   />
                 ) : (
@@ -226,28 +290,35 @@ const ContentModeration = () => {
                 )}
               </div>
               <Typography variant="h6" gutterBottom>
-                Reports ({selectedPost.reports.length})
+                Reports Breakdown
               </Typography>
-              {selectedPost.reports.map((report, index) => (
-                <div key={index} style={{ marginBottom: '10px' }}>
-                  <Typography variant="body2">
-                    <strong>{report.reason}</strong> - 
-                    {moment(report.createdAt).format('MMM D, h:mm a')}
-                  </Typography>
-                </div>
-              ))}
+              <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                {Object.entries(
+                  selectedPost.reports.reduce((acc, report) => {
+                    acc[report.reason] = (acc[report.reason] || 0) + 1;
+                    return acc;
+                  }, {})
+                ).map(([reason, count]) => (
+                  <Chip
+                    key={reason}
+                    label={`${reason}: ${count}`}
+                    color="error"
+                    variant="outlined"
+                  />
+                ))}
+              </div>
             </>
           )}
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={() => handleDeletePost(selectedPost?._id)}
             color="error"
             startIcon={<Delete />}
           >
             Confirm Delete
           </Button>
-          <Button 
+          <Button
             onClick={() => handleClearReports(selectedPost?._id)}
             color="primary"
             startIcon={<CheckCircle />}

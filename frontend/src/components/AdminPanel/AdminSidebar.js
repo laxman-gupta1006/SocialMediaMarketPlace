@@ -25,7 +25,6 @@ const sidebarItems = [
   { text: 'Users', icon: <People />, path: '/admin/users' },
   { text: 'Content', icon: <PostAdd />, path: '/admin/content' },
   { text: 'Marketplace', icon: <Store />, path: '/admin/marketplace' },
-  { text: 'Audit', icon: <Settings />, path: '/admin/audit' },
 ];
 
 const AdminSidebar = () => {

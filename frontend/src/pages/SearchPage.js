@@ -168,7 +168,7 @@ const SearchPage = () => {
                     variant={user.isFollowing ? "outlined" : "contained"}
                     startIcon={user.isFollowing ? <Check /> : <PersonAdd />}
                     onClick={() => handleFollow(user._id)}
-                    disabled={user.isProcessing || (user.isPrivate && !user.isFollowing)}
+                    disabled={user.isProcessing}
                     sx={{
                       textTransform: 'none',
                       borderRadius: '20px',
@@ -179,7 +179,7 @@ const SearchPage = () => {
                       } : {})
                     }}
                   >
-                    {user.isFollowing ? 'Unfollow' : user.isPrivate ? 'Private' : 'Follow'}
+                    {user.isFollowing ? 'Unfollow' : 'Follow'}
                   </Button>
                 )}
               </Paper>

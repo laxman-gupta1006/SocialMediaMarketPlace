@@ -106,7 +106,15 @@ const App = () => {
               </AdminRoute>
             }
           />
-
+      <Route
+            path="/profile/:userId?"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+                <Navigation />
+              </ProtectedRoute>
+            }
+          />
           {/* Protected User Routes */}
           <Route
             path="/"
@@ -117,15 +125,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/profile/:userId?"
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-                <Navigation />
-              </ProtectedRoute>
-            }
-          />
+    
           <Route
             path="/new-post"
             element={
@@ -168,7 +168,7 @@ const App = () => {
           />
           <Route path="/error/server-down" element={<ServerDownPage />} />
           {/* Fallback Route */}
-          <Route path="*" element={<NotFoundPage />} />
+          {/* <Route path="*" element={<NotFoundPage />} /> */}
         </Routes>
       </Box>
     </ThemeProvider>

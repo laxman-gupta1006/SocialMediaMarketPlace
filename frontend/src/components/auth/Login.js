@@ -32,18 +32,37 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await login(formData);
-      if (response && response.otpRequired) {
-        setStep(2);
-        setMaskedEmail(response.email);
+      // Send login request to the backend
+      const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData)
+      });
+      
+      const data = await response.json();
+  
+      if (!response.ok) {
+        // Here, error messages like "Account suspended" or "User is banned" are passed through
+        throw new Error(data.error || 'Login failed');
       }
-      // If no OTP required, login function already handles navigation
+      
+      // Check if 2FA is required
+      if (data.otpRequired) {
+        setStep(2);
+        setMaskedEmail(data.email);
+      } else {
+        // If login is successful, your auth context login method should handle navigation
+        await login();
+      }
     } catch (err) {
+      // Set the error message from the backend, including suspended/banned errors
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
     }
   };
+  
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
