@@ -1,18 +1,39 @@
 import { useState, useRef, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import {
-  Grid, Box, Typography, IconButton, Button, Dialog, DialogTitle, DialogContent,
-  DialogActions, TextField, Checkbox, List, ListItem, ListItemAvatar, Avatar,
-  ListItemText, FormControlLabel, CircularProgress
+  Grid, Box, Typography, IconButton, Button, Dialog, DialogTitle, 
+  DialogContent, DialogActions, TextField, Checkbox, List, ListItem, 
+  ListItemAvatar, Avatar, ListItemText, FormControlLabel, CircularProgress, 
+  Fade, Slide, Skeleton, Drawer, useMediaQuery, useTheme
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import forge from 'node-forge';
 import AddIcon from '@mui/icons-material/Add';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import ConversationList from '../components/messages/CoversationList';
 import ChatHeader from '../components/messages/ChatHeader';
 import MessageBubble from '../components/messages/MessageBubble';
 import MessageInput from '../components/messages/MessageInput';
+import Logo from '../components/Logo';
+
+// Styled components
+const GradientBox = styled(Box)(({ theme }) => ({
+  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+  color: theme.palette.common.white,
+}));
+
+const AnimatedMessageBubble = styled(MessageBubble)({
+  transition: 'transform 0.2s, opacity 0.2s',
+  '&:hover': {
+    transform: 'scale(1.01)'
+  }
+});
 
 const MessagesPage = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [selectedChat, setSelectedChat] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [conversations, setConversations] = useState([]);
@@ -22,23 +43,28 @@ const MessagesPage = () => {
   const [availableUsers, setAvailableUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [groupError, setGroupError] = useState('');
-  const [symmetricKey, setSymmetricKey] = useState(null); // Make sure symmetricKey is defined correctly
+  const [symmetricKey, setSymmetricKey] = useState(null);
   const [privateKey, setPrivateKey] = useState(null);
-  // Add loading state for spinner
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadingConversations, setLoadingConversations] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(!isMobile);
 
   const messagesEndRef = useRef(null);
   const socket = useRef(null);
+
+  // Effect for responsive drawer
+  useEffect(() => {
+    setDrawerOpen(!isMobile);
+  }, [isMobile]);
 
   const decryptMessage = (encryptedText, ivBase64, symmetricKey) => {
     try {
       const iv = forge.util.decode64(ivBase64);
       const ciphertextBytes = forge.util.decode64(encryptedText);
-  
       const decipher = forge.cipher.createDecipher('AES-CBC', symmetricKey);
       decipher.start({ iv });
       decipher.update(forge.util.createBuffer(ciphertextBytes, 'raw'));
-  
       const success = decipher.finish();
       if (success) {
         const decrypted = decipher.output.toString();
@@ -54,73 +80,78 @@ const MessagesPage = () => {
     }
   };
 
-  // Add loading spinner timer
+  // Fetch user information on mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 5000); // 5 seconds loading time
-    
-    return () => clearTimeout(timer);
-  }, []);
-  
-  useEffect(() => {
-    const exchangeKey = async () => {
-      // Generate RSA key pair
-      const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
-      const publicKeyPem = forge.pki.publicKeyToPem(keypair.publicKey);
-      const privateKeyPem = forge.pki.privateKeyToPem(keypair.privateKey);
-
-      console.log("🔑 Public Key (PEM):\n", publicKeyPem);
-      console.log("🔒 Private Key (PEM):\n", privateKeyPem);
-
-      const res = await fetch('https://localhost:3000/api/messages/exchange-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ publicKeyPem })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.encryptedSymmetricKey) {
-        console.log("📦 Encrypted Symmetric Key (Base64):", data.encryptedSymmetricKey);
-
-        // Decrypt the symmetric key using private key
-        const encryptedBytes = forge.util.decode64(data.encryptedSymmetricKey);
-        const decryptedSymmetricKey = keypair.privateKey.decrypt(encryptedBytes, 'RSA-OAEP');
-        console.log("🔓 Decrypted Symmetric Key:", decryptedSymmetricKey);
-
-        setSymmetricKey(decryptedSymmetricKey); // Store for later use
-        setPrivateKey(keypair.privateKey);      // Needed for decryption
-      } else {
-        console.error('Key exchange failed:', data.error);
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('https://192.168.2.250:3000/api/auth/me', { credentials: 'include' });
+        const data = await res.json();
+        if (data?._id) setCurrentUserId(data._id);
+        setInitialLoading(false);
+      } catch (err) {
+        console.error('Error fetching user ID:', err);
+        setInitialLoading(false);
       }
     };
 
-    if (currentUserId) {
-      exchangeKey();
-    }
-  }, [currentUserId]);
-
-  useEffect(() => {
-    fetch('https://localhost:3000/api/auth/me', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        if (data?._id) setCurrentUserId(data._id);
-      })
-      .catch(err => console.error('Error fetching user ID:', err));
+    fetchUser();
   }, []);
 
+  // Handle key exchange once user is authenticated
   useEffect(() => {
     if (!currentUserId) return;
 
-    socket.current = io('https://localhost:3000', { withCredentials: true });
+    const exchangeKey = async () => {
+      try {
+        // Generate RSA key pair
+        const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
+        const publicKeyPem = forge.pki.publicKeyToPem(keypair.publicKey);
+        const privateKeyPem = forge.pki.privateKeyToPem(keypair.privateKey);
+
+        console.log("🔑 Public Key (PEM):\n", publicKeyPem);
+        console.log("🔒 Private Key (PEM):\n", privateKeyPem);
+
+        const res = await fetch('https://192.168.2.250:3000/api/messages/exchange-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ publicKeyPem })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.encryptedSymmetricKey) {
+          console.log("📦 Encrypted Symmetric Key (Base64):", data.encryptedSymmetricKey);
+
+          // Decrypt the symmetric key using private key
+          const encryptedBytes = forge.util.decode64(data.encryptedSymmetricKey);
+          const decryptedSymmetricKey = keypair.privateKey.decrypt(encryptedBytes, 'RSA-OAEP');
+          console.log("🔓 Decrypted Symmetric Key:", decryptedSymmetricKey);
+
+          setSymmetricKey(decryptedSymmetricKey); // Store for later use
+          setPrivateKey(keypair.privateKey);      // Needed for decryption
+        } else {
+          console.error('Key exchange failed:', data.error);
+        }
+      } catch (error) {
+        console.error('Key exchange failed:', error);
+      }
+    };
+
+    exchangeKey();
+  }, [currentUserId]);
+
+  // Initialize Socket.IO connection
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    socket.current = io('https://192.168.2.250:3000', { withCredentials: true });
 
     socket.current.emit('join', currentUserId);
 
     socket.current.on('newMessage', (chatId) => {
       if (selectedChat?.chatId === chatId) {
         const fetchAndUpdateMessages = () => {
-          fetch(`https://localhost:3000/api/messages/get-messages?chatId=${chatId}`, {
+          fetch(`https://192.168.2.250:3000/api/messages/get-messages?chatId=${chatId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
@@ -130,9 +161,8 @@ const MessagesPage = () => {
               if (data.messages) {
                 const decryptedMessages = data.messages.map(msg => ({
                   ...msg,
-                  text: msg.type === 'text' && symmetricKey && msg.iv? decryptMessage(msg.text, msg.iv, symmetricKey): msg.text
+                  text: msg.type === 'text' && symmetricKey && msg.iv ? decryptMessage(msg.text, msg.iv, symmetricKey) : msg.text
                 }));
-            
                 setSelectedChat(prev => ({
                   ...prev,
                   messages: decryptedMessages
@@ -141,9 +171,9 @@ const MessagesPage = () => {
             })
             .catch(err => console.error('Error fetching updated messages:', err));
         };
-    
-        // 💡 Add delay only if last message is an image
-        fetch(`https://localhost:3000/api/messages/get-messages?chatId=${chatId}`, {
+        
+        // Add delay only if last message is an image
+        fetch(`https://192.168.2.250:3000/api/messages/get-messages?chatId=${chatId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'
@@ -152,15 +182,13 @@ const MessagesPage = () => {
           .then(data => {
             const lastMsg = data.messages?.[data.messages.length - 1];
             const isImage = lastMsg?.type === 'picture';
-    
-            const delay = isImage ? 1000 : 0; // ⏳ 1 second delay for image
-    
+            const delay = isImage ? 1000 : 0; // 1 second delay for image
             setTimeout(fetchAndUpdateMessages, delay);
           })
           .catch(err => console.error('Error pre-checking message type:', err));
       }
     });
-    
+
     socket.current.on('groupCreated', () => {
       loadConversations();
     });
@@ -168,109 +196,121 @@ const MessagesPage = () => {
     return () => {
       socket.current.disconnect();
     };
-  }, [currentUserId, selectedChat?.chatId]);
+  }, [currentUserId, selectedChat?.chatId, symmetricKey]);
 
-  const loadConversations = () => {
-    fetch('https://localhost:3000/api/messages/my-chats', {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data.chats)) {
-          const updated = data.chats.map(chat => {
-            const other = chat.participants.find(p => p.userId !== currentUserId);
-            return {
-              id: chat.chatId || chat._id,
-              chatId: chat.chatId || chat._id,
-              name: chat.name || other?.username || 'Unknown User',
-              avatar: chat.isGroup ? '/group-avatar.png' : other?.profileImage || '/default-profile.png',
-              isGroup: chat.isGroup,
-              participants: chat.participants
-            };
-          });
+  // Load all conversations
+  const loadConversations = async () => {
+    setLoadingConversations(true);
+    try {
+      const res = await fetch('https://192.168.2.250:3000/api/messages/my-chats', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await res.json();
+      
+      if (Array.isArray(data.chats)) {
+        const updated = data.chats.map(chat => {
+          const other = chat.participants.find(p => p.userId !== currentUserId);
+          return {
+            id: chat.chatId || chat._id,
+            chatId: chat.chatId || chat._id,
+            name: chat.name || other?.username || 'Unknown User',
+            avatar: chat.isGroup ? '/group-avatar.png' : other?.profileImage || '/default-profile.png',
+            isGroup: chat.isGroup,
+            participants: chat.participants
+          };
+        });
 
-          setConversations(updated);
+        setConversations(updated);
 
-          const directUsers = updated
-            .filter(chat => !chat.isGroup)
-            .map(chat => chat.participants.find(p => p.userId !== currentUserId))
-            .filter(Boolean);
+        const directUsers = updated
+          .filter(chat => !chat.isGroup)
+          .map(chat => chat.participants.find(p => p.userId !== currentUserId))
+          .filter(Boolean);
 
-          setAvailableUsers(directUsers);
-        }
-      })
-      .catch(err => console.error('Error loading conversations:', err));
+        setAvailableUsers(directUsers);
+      }
+    } catch (err) {
+      console.error('Error loading conversations:', err);
+    } finally {
+      setLoadingConversations(false);
+    }
   };
 
   useEffect(() => {
-    if (currentUserId) loadConversations();
-  }, [currentUserId]);
+    if (currentUserId && !initialLoading) {
+      loadConversations();
+    }
+  }, [currentUserId, initialLoading]);
 
+  // Load messages for a selected chat
   useEffect(() => {
     if (!selectedChat?.chatId) return;
-  
-    fetch(`https://localhost:3000/api/messages/get-messages?chatId=${selectedChat.chatId}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include'
-    })
-      .then(res => res.json())
-      .then(data => {
+    
+    const loadMessages = async () => {
+      setLoadingMessages(true);
+      try {
+        const res = await fetch(`https://192.168.2.250:3000/api/messages/get-messages?chatId=${selectedChat.chatId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+        const data = await res.json();
+        
         if (data.messages) {
           const decryptedMessages = data.messages.map(msg => ({
             ...msg,
-            text: msg.type === 'text' && symmetricKey && msg.iv? decryptMessage(msg.text, msg.iv, symmetricKey): msg.text
+            text: msg.type === 'text' && symmetricKey && msg.iv ? decryptMessage(msg.text, msg.iv, symmetricKey) : msg.text
           }));
-      
           setSelectedChat(prev => ({
             ...prev,
             messages: decryptedMessages
           }));
         }
-      })
-      .catch(err => console.error('Error loading messages:', err));
-  
+      } catch (err) {
+        console.error('Error loading messages:', err);
+      } finally {
+        setLoadingMessages(false);
+      }
+    };
+    
+    loadMessages();
     socket.current.emit('joinChat', selectedChat.chatId);
-  
+    
     return () => {
       socket.current.emit('leaveChat', selectedChat.chatId);
     };
-  }, [selectedChat?.chatId]);
-  
+  }, [selectedChat?.chatId, symmetricKey]);
 
+  // Auto-scroll to bottom when messages update
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [selectedChat?.messages]);
 
+  // Handle sending a text message
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedChat?.chatId || !symmetricKey) return;
-  
     try {
       // 1. Generate random IV
       const iv = forge.random.getBytesSync(16);
-  
       // 2. Encrypt the message using AES-CBC
       const cipher = forge.cipher.createCipher('AES-CBC', symmetricKey);
       cipher.start({ iv });
       cipher.update(forge.util.createBuffer(newMessage, 'utf8'));
       cipher.finish();
       const encrypted = cipher.output.getBytes();
-  
       // 3. Base64 encode both encrypted message and IV
       const encryptedBase64 = forge.util.encode64(encrypted);
       const ivBase64 = forge.util.encode64(iv);
-  
-      // 🟡 LOG EVERYTHING HERE
+      // Log encryption details
       console.log("Original Message:", newMessage);
       console.log("Encrypted (Base64):", encryptedBase64);
       console.log("IV (Base64):", ivBase64);
-  
       // 4. Send encrypted message to server
-      const res = await fetch('https://localhost:3000/api/messages/send-message', {
+      const res = await fetch('https://192.168.2.250:3000/api/messages/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -281,20 +321,16 @@ const MessagesPage = () => {
           type: 'text'
         })
       });
-  
       const data = await res.json();
-  
       if (res.ok && data.newMessage) {
         const newMessageObj = {
           ...data.newMessage,
           text: newMessage // display plain text locally
         };
-  
         setSelectedChat(prev => ({
           ...prev,
           messages: [...(prev.messages || []), newMessageObj]
         }));
-  
         socket.current.emit('newMessage', selectedChat.chatId);
         setNewMessage('');
       }
@@ -302,15 +338,14 @@ const MessagesPage = () => {
       console.error('Error encrypting/sending message:', error);
     }
   };
-  
+
+  // Handle file uploads
   const handleFileUpload = ({ file }) => {
     if (!file || !selectedChat?.chatId) return;
-  
     const formData = new FormData();
     formData.append('image', file);
     formData.append('chatId', selectedChat.chatId);
-  
-    fetch('https://localhost:3000/api/messages/send-message', {
+    fetch('https://192.168.2.250:3000/api/messages/send-message', {
       method: 'POST',
       credentials: 'include',
       body: formData
@@ -322,15 +357,14 @@ const MessagesPage = () => {
             ...prev,
             messages: [...prev.messages, data.newMessage]
           }));
-  
-          // 🔥 Add this to notify others
+          // Notify others in the chat
           socket.current.emit('newMessage', selectedChat.chatId);
         }
       })
       .catch(err => console.error('Error sending file:', err));
   };
-  
 
+  // Handle group creation
   const handleCreateGroup = () => {
     if (!groupName.trim()) return setGroupError('Group name is required.');
     if (selectedUsers.length < 2) return setGroupError('Select at least 2 members.');
@@ -340,7 +374,7 @@ const MessagesPage = () => {
       participantIds: selectedUsers
     };
 
-    fetch('https://localhost:3000/api/messages/addgroup', {
+    fetch('https://192.168.2.250:3000/api/messages/addgroup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -350,6 +384,9 @@ const MessagesPage = () => {
       .then(data => {
         if (data.success) {
           setOpenGroupModal(false);
+          setGroupName('');
+          setSelectedUsers([]);
+          setGroupError('');
           loadConversations();
           socket.current.emit('createGroup', data.newGroup);
         } else {
@@ -362,6 +399,7 @@ const MessagesPage = () => {
       });
   };
 
+  // Handle user selection for groups
   const handleCheckboxChange = (userId) => {
     setSelectedUsers(prev =>
       prev.includes(userId)
@@ -370,176 +408,344 @@ const MessagesPage = () => {
     );
   };
 
-  // Render loading overlay when loading is true
-  if (loading) {
-    return (
-      <>
-        {/* Transparent overlay with blur effect */}
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 9999,
-            bgcolor: 'rgba(255, 255, 255, 0.7)',
-            backdropFilter: 'blur(5px)'
-          }}
-        >
-          <Box sx={{ textAlign: 'center' }}>
-            <CircularProgress size={60} thickness={4} />
-            <Typography variant="h6" sx={{ mt: 2 }}>Loading your secure messages...</Typography>
-          </Box>
-        </Box>
-        
-        {/* Background content (blurred) */}
-        <Grid container sx={{ height: '100vh', overflow: 'hidden', filter: 'blur(5px)' }}>
-          <Grid
-            item
-            xs={12}
-            md={4}
-            sx={{
-              borderRight: '1px solid',
-              borderColor: 'divider',
-              height: '100vh',
-              display: 'flex',
-              flexDirection: 'column'
-            }}
-          >
-            <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6">Chats</Typography>
-              <IconButton><AddIcon /></IconButton>
-            </Box>
-            <Box sx={{ flex: 1, overflowY: 'auto' }}></Box>
-          </Grid>
+  // Handler for when a conversation is selected
+  const handleConversationSelect = (chat) => {
+    if (selectedChat?.chatId !== chat.chatId) {
+      setSelectedChat(chat);
+      if (isMobile) {
+        setDrawerOpen(false);
+      }
+    }
+  };
 
-          <Grid
-            item
-            xs={12}
-            md={8}
-            sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}
-          >
-            <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <Typography>Select a conversation to start chatting</Typography>
-            </Box>
-          </Grid>
-        </Grid>
-      </>
-    );
-  }
+  // Toggle sidebar drawer for mobile
+  const toggleDrawer = () => {
+    setDrawerOpen(prev => !prev);
+  };
 
-  return (
-    <Grid container sx={{ height: '100vh', overflow: 'hidden' }}>
-      <Grid
-        item
-        xs={12}
-        md={4}
+  // Loading overlay component
+  const LoadingOverlay = () => (
+    <Fade in={initialLoading} timeout={500}>
+      <Box
         sx={{
-          borderRight: '1px solid',
-          borderColor: 'divider',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
           height: '100vh',
           display: 'flex',
-          flexDirection: 'column'
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          bgcolor: 'background.paper',
+          flexDirection: 'column',
         }}
       >
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">Chats</Typography>
-          <IconButton onClick={() => setOpenGroupModal(true)}><AddIcon /></IconButton>
+        <Slide direction="up" in={true} mountOnEnter unmountOnExit>
+          <Box sx={{ textAlign: 'center' }}>
+            <Logo />
+            <CircularProgress
+              size={60}
+              thickness={4}
+              sx={{ color: 'primary.main', mt: 3 }}
+            />
+            <Typography variant="h6" sx={{ mt: 3, fontWeight: 500 }}>
+              Securing Your Conversations...
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary', maxWidth: '80%', mx: 'auto' }}>
+              Setting up end-to-end encryption for your messages
+            </Typography>
+          </Box>
+        </Slide>
+      </Box>
+    </Fade>
+  );
+
+  if (initialLoading) {
+    return <LoadingOverlay />;
+  }
+
+  const renderSidebar = () => (
+    <Box
+      sx={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: 'background.default',
+        borderRight: '1px solid',
+        borderColor: 'divider',
+        width: '100%'
+      }}
+    >
+      <GradientBox sx={{ 
+        p: 2, 
+        boxShadow: 2,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>Conversations</Typography>
+        <Box>
+          <IconButton
+            color="inherit"
+            onClick={() => setOpenGroupModal(true)}
+            size="small"
+            sx={{ ml: 1 }}
+          >
+            <AddIcon />
+          </IconButton>
+          {isMobile && (
+            <IconButton
+              color="inherit"
+              onClick={toggleDrawer}
+              size="small"
+              sx={{ ml: 1 }}
+            >
+              <CloseIcon />
+            </IconButton>
+          )}
         </Box>
+      </GradientBox>
+      
+      {loadingConversations ? (
+        <Box sx={{ p: 2 }}>
+          {[...Array(5)].map((_, i) => (
+            <Skeleton
+              key={i}
+              variant="rounded"
+              width="100%"
+              height={72}
+              sx={{ mb: 1, borderRadius: 2 }}
+            />
+          ))}
+        </Box>
+      ) : (
         <Box sx={{ flex: 1, overflowY: 'auto' }}>
           <ConversationList
             conversations={conversations}
             selectedChat={selectedChat}
-            onSelect={(chat) => {
-              if (selectedChat?.chatId !== chat.chatId) {
-                setSelectedChat(chat);
-              }
-            }}
+            onSelect={handleConversationSelect}
+            loading={loadingConversations}
           />
         </Box>
-      </Grid>
+      )}
+    </Box>
+  );
 
-      <Grid
-        item
-        xs={12}
-        md={8}
-        sx={{ display: 'flex', flexDirection: 'column', height: '100vh' }}
-      >
+  return (
+    <Box sx={{ height: '100vh', overflow: 'hidden', position: 'relative', display: 'flex' }}>
+      {/* Sidebar for desktop */}
+      {!isMobile ? (
+        <Box sx={{ width: drawerOpen ? '320px' : 0, transition: 'width 0.3s ease' }}>
+          {drawerOpen && renderSidebar()}
+        </Box>
+      ) : (
+        <Drawer
+          anchor="left"
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          sx={{
+            '& .MuiDrawer-paper': {
+              width: '85%',
+              maxWidth: '320px',
+              boxSizing: 'border-box',
+            },
+          }}
+        >
+          {renderSidebar()}
+        </Drawer>
+      )}
+      
+      {/* Chat area */}
+      <Box sx={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column',
+        height: '100vh',
+        bgcolor: 'background.paper'
+      }}>
         {selectedChat ? (
           <>
-            <Box sx={{ position: 'sticky', top: 0, zIndex: 2, bgcolor: 'white' }}>
-              <ChatHeader chat={selectedChat} />
-            </Box>
-            <Box sx={{ flex: 1, overflowY: 'auto', p: 2, bgcolor: 'grey.50' }}>
-              {selectedChat.messages?.map((message, i) => (
-                <MessageBubble
-                  key={i}
-                  message={message}
-                  isGroup={selectedChat.isGroup}
-                  currentUserId={currentUserId}
-                  isImage={message.type === 'picture'}
-                  chatName={selectedChat.name}
-                />
-              ))}
+            <ChatHeader
+              chat={selectedChat}
+              onMenuClick={toggleDrawer}
+              isMobile={isMobile}
+              sx={{
+                bgcolor: 'background.default',
+                boxShadow: 1,
+                zIndex: 1
+              }}
+            />
+            
+            <Box sx={{
+              flex: 1,
+              overflowY: 'auto',
+              p: 2,
+              bgcolor: theme.palette.mode === 'light' ? '#f5f7fa' : '#1a1a2e'
+            }}>
+              {loadingMessages ? (
+                <Box sx={{ textAlign: 'center', mt: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : selectedChat.messages?.length === 0 ? (
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  height: '100%',
+                  color: 'text.secondary'
+                }}>
+                  <Typography variant="h6">No messages yet</Typography>
+                  <Typography variant="body2">Be the first to send a message!</Typography>
+                </Box>
+              ) : (
+                selectedChat.messages?.map((message, i) => (
+                  <AnimatedMessageBubble
+                    key={i}
+                    message={message}
+                    isGroup={selectedChat.isGroup}
+                    currentUserId={currentUserId}
+                    isImage={message.type === 'picture'}
+                    chatName={selectedChat.name}
+                    prevSender={i > 0 ? selectedChat.messages[i-1].sender : null}
+                  />
+                ))
+              )}
               <div ref={messagesEndRef} />
             </Box>
-            <Box sx={{ position: 'sticky', bottom: 0, bgcolor: 'grey.50', p: 1 }}>
+            
+            <Box sx={{
+              position: 'sticky',
+              bottom: 0,
+              bgcolor: 'background.default',
+              p: 2,
+              boxShadow: '0px -2px 10px rgba(0,0,0,0.05)',
+              borderTop: '1px solid',
+              borderColor: 'divider'
+            }}>
               <MessageInput
                 value={newMessage}
                 onChange={e => setNewMessage(e.target.value)}
                 onSend={handleSend}
                 onFileUpload={handleFileUpload}
+                loading={loadingMessages}
               />
             </Box>
           </>
         ) : (
-          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <Typography>Select a conversation to start chatting</Typography>
+          <Box sx={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            background: theme.palette.mode === 'light' 
+              ? 'linear-gradient(45deg, #f5f7fa 30%, #ffffff 90%)'
+              : 'linear-gradient(45deg, #1a1a2e 30%, #16213e 90%)',
+            p: 3
+          }}>
+            {isMobile && !drawerOpen && (
+              <IconButton 
+                sx={{ position: 'absolute', top: 16, left: 16 }}
+                onClick={toggleDrawer}
+                color="primary"
+              >
+                <MenuIcon />
+              </IconButton>
+            )}
+            <Box sx={{ textAlign: 'center', maxWidth: '400px' }}>
+              <Logo />
+              <Typography variant="h5" sx={{ mt: 3, fontWeight: 500 }}>
+                Welcome to SecureChat
+              </Typography>
+              <Typography variant="body1" sx={{ mt: 2, color: 'text.secondary' }}>
+                Select a conversation from the sidebar or create a new group to start chatting securely.
+              </Typography>
+              {isMobile && (
+                <Button 
+                  variant="contained" 
+                  onClick={toggleDrawer}
+                  sx={{ mt: 3 }}
+                >
+                  Open Conversations
+                </Button>
+              )}
+            </Box>
           </Box>
         )}
-      </Grid>
+      </Box>
 
+      {/* Group creation dialog */}
       <Dialog open={openGroupModal} onClose={() => setOpenGroupModal(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Create New Group</DialogTitle>
+        <DialogTitle>
+          <Typography variant="h6">Create New Group</Typography>
+        </DialogTitle>
         <DialogContent>
           <TextField
             fullWidth
             label="Group Name"
             value={groupName}
             onChange={e => setGroupName(e.target.value)}
-            sx={{ mb: 2 }}
+            sx={{ mt: 1, mb: 3 }}
           />
-          <List>
-            {availableUsers.map(user => (
-              <ListItem key={user._id}>
-                <ListItemAvatar>
-                  <Avatar src={user.profileImage || '/default-profile.png'} />
-                </ListItemAvatar>
-                <ListItemText primary={user.username} />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={selectedUsers.includes(user.userId)}
-                      onChange={() => handleCheckboxChange(user.userId)}
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>Select Group Members:</Typography>
+          {availableUsers.length > 0 ? (
+            <List sx={{ maxHeight: '300px', overflow: 'auto' }}>
+              {availableUsers.map(user => (
+                <ListItem key={user._id || user.userId} sx={{ py: 0.5 }}>
+                  <ListItemAvatar>
+                    <Avatar 
+                      src={user.profileImage || '/default-profile.png'}
+                      sx={{ width: 36, height: 36 }}
                     />
-                  }
-                  label=""
-                />
-              </ListItem>
-            ))}
-          </List>
-          {groupError && <Typography color="error">{groupError}</Typography>}
+                  </ListItemAvatar>
+                  <ListItemText primary={user.username} />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={selectedUsers.includes(user.userId)}
+                        onChange={() => handleCheckboxChange(user.userId)}
+                        color="primary"
+                      />
+                    }
+                    label=""
+                  />
+                </ListItem>
+              ))}
+            </List>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              No users available. Start conversations with other users first.
+            </Typography>
+          )}
+          {groupError && (
+            <Typography color="error" sx={{ mt: 2 }}>
+              {groupError}
+            </Typography>
+          )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenGroupModal(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreateGroup}>Create Group</Button>
+        <DialogActions sx={{ p: 2 }}>
+          <Button 
+            onClick={() => {
+              setOpenGroupModal(false);
+              setGroupName('');
+              setSelectedUsers([]);
+              setGroupError('');
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleCreateGroup}
+            disabled={!groupName.trim() || selectedUsers.length < 2}
+          >
+            Create Group
+          </Button>
         </DialogActions>
       </Dialog>
-    </Grid>
+    </Box>
   );
 };
 
