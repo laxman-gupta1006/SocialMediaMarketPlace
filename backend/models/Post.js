@@ -54,16 +54,6 @@ const postSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  visibility: { 
-    type: String, 
-    enum: ["public", "private", "followers"], 
-    default: "public"
-  },
-  authorizedUsers: [{ 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "User",
-    index: true
-  }],
   reports: [{
     userId: { 
       type: mongoose.Schema.Types.ObjectId, 

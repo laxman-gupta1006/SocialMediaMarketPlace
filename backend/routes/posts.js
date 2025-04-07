@@ -59,7 +59,7 @@ const upload = multer({
 // Create new post
 router.post('/', authMiddleware, upload.single('media'), async (req, res) => {
   try {
-    const { caption, visibility = 'public' } = req.body;
+    const { caption } = req.body;
     
     if (!req.file) return res.status(400).json({ error: 'Media file is required' });
 
@@ -76,7 +76,6 @@ router.post('/', authMiddleware, upload.single('media'), async (req, res) => {
       media: `/uploads/posts/${req.file.filename}`,
       mediaType,
       caption: sanitizedCaption,
-      visibility
     });
 
     await newPost.save();
@@ -115,29 +114,22 @@ router.get('/', authMiddleware, async (req, res) => {
     const userId = req.userId;
     const { page = 1, limit = 10 } = req.query;
 
-    // Get user's following list
-    const currentUser = await User.findById(userId).select('following');
-    // Assuming following is an array of objects with a `userId` property
-    const followingIds = currentUser.following.map(f => f.userId);
+    // Get users whose posts are visible
+    const [publicUsers, followedPrivateUsers] = await Promise.all([
+      User.find({ 'privacySettings.profileVisibility': 'public' }).select('_id'),
+      User.find({
+        'privacySettings.profileVisibility': 'private',
+        'followers.userId': userId
+      }).select('_id')
+    ]);
 
-    // Build query:
-    // - Public posts: visible to everyone.
-    // - Non-public posts (private or followers): visible only if the post author is in your following list.
-    // - Always include your own posts.
-    const query = {
-      $or: [
-        { visibility: 'public' },
-        { userId: userId },
-        {
-          $and: [
-            { userId: { $in: followingIds } },
-            { visibility: { $ne: 'public' } }
-          ]
-        }
-      ]
-    };
+    const allowedUserIds = [
+      ...publicUsers.map(u => u._id),
+      ...followedPrivateUsers.map(u => u._id),
+      new mongoose.Types.ObjectId(userId)
+    ];
 
-    const posts = await Post.find(query)
+    const posts = await Post.find({ userId: { $in: allowedUserIds } })
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
@@ -180,53 +172,29 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
-    const userId = req.params.userId;
-    const currentUserId = req.userId;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const targetUser = await User.findById(req.params.userId)
+    .select('privacySettings followers');
 
-    console.log("Incoming User ID:", userId);
-    console.log("Current User ID:", currentUserId);
+  if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ error: 'Invalid user ID format' });
-    }
+  const isOwner = targetUser._id.equals(req.userId);
+  const isFollowing = targetUser.followers.some(f => f.userId.equals(req.userId));
+  
+  if (targetUser.privacySettings.profileVisibility === 'private' && !isOwner && !isFollowing) {
+    return res.status(200).json({ 
+      posts: [], 
+      total: 0,
+      isPrivate: true,
+      message: 'This account is private. Follow to see their posts.'
+    });
+  }
 
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const currentUserObjectId = new mongoose.Types.ObjectId(currentUserId);
 
-    const targetUser = await User.findById(userObjectId).lean();
-    if (!targetUser) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const isOwner = userObjectId.equals(currentUserObjectId);
-    const isFollowing = targetUser.followers.some(f => f.userId.equals(currentUserObjectId));
-
-    // 🧠 Visibility logic
-    let visibilityFilter = { visibility: 'public' };
-    if (isOwner) {
-      visibilityFilter = {}; // All posts
-    } else if (isFollowing) {
-      visibilityFilter = { visibility: { $in: ['public', 'followers'] } };
-    }
-
-    const postQuery = {
-      userId: userObjectId,
-      ...visibilityFilter
-    };
-
-    console.log("Post Query:", JSON.stringify(postQuery, null, 2));
-
-    const posts = await Post.find(postQuery)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .populate({
-        path: 'userId',
-        select: 'username profileImage'
-      })
-      .lean();
+  // Fetch posts if visible
+  const posts = await Post.find({ userId: targetUser._id })
+    .sort({ createdAt: -1 })
+    .populate('userId', 'username profileImage')
+    .lean();
 
     console.log("Found Posts:", posts.length);
 
@@ -281,9 +249,21 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
   }
 });
 
+const checkPostAccess = async (postId, userId) => {
+  const post = await Post.findById(postId).populate('userId');
+  if (!post) return false;
+
+  const author = post.userId;
+  return author.privacySettings.profileVisibility === 'public' ||
+    author._id.equals(userId) ||
+    author.followers.some(f => f.userId.equals(userId));
+};
+
 // Like/Unlike post
 // Like/Unlike post - Updated version
 router.put('/like/:postId', authMiddleware, async (req, res) => {
+  const hasAccess = await checkPostAccess(req.params.postId, req.userId);
+  if (!hasAccess) return res.status(403).json({ error: 'Not authorized' });
   try {
     const post = await Post.findById(req.params.postId)
       .populate('userId', 'followers');

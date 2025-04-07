@@ -8,7 +8,11 @@ const fs = require('fs');
 const authMiddleware = require('../middleware/auth');
 const User = require('../models/User');
 const Post = require('../models/Post');
+const OTPVerification = require('../models/OTPVerification');
+const nodemailer = require('nodemailer');
+require('dotenv').config();
 
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 // Configure multer for profile photo uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -80,9 +84,6 @@ router.post('/profile-photo', authMiddleware, upload.single('photo'), async (req
 // Helper function to validate MongoDB ID
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// @route   GET /api/users/user/:userId
-// @desc    Get user profile and posts
-// @access  Private
 router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
     if (!isValidObjectId(req.params.userId)) {
@@ -98,29 +99,37 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Get user posts with visibility check
-    const posts = await Post.find({
-      userId: req.params.userId,
-      $or: [
-        { visibility: 'public' },
-        { 
-          visibility: 'private', 
-          authorizedUsers: { $in: [req.userId] }
-        }
-      ]
-    })
-    .sort({ createdAt: -1 })
-    .lean();
-
-    // Check if current user follows this user
+    // Determine if the current user is the owner or is following
+    const isOwner = req.userId === req.params.userId;
     const isFollowing = user.followers.some(follower => 
       follower._id.toString() === req.userId
     );
+    const canSeePosts = isOwner || isFollowing || user.privacySettings.profileVisibility === 'public';
+
+    let posts = [];
+    let postsCount = 0;
+    if (!canSeePosts) {
+      // Account is private and current user cannot see posts.
+      return res.json({
+        ...user,
+        postsCount: 0,
+        isFollowing,
+        isPrivate: true,
+        posts: []
+      });
+    } else {
+      // Fetch all posts for this user.
+      posts = await Post.find({ userId: req.params.userId })
+        .sort({ createdAt: -1 })
+        .lean();
+      postsCount = posts.length;
+    }
 
     res.json({
       ...user,
-      postsCount: posts.length,
+      postsCount,
       isFollowing,
+      isPrivate: false,
       posts: posts.map(post => ({
         ...post,
         likesCount: post.likes.length,
@@ -133,6 +142,7 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 // @route   PUT /api/users/visibility
 // @desc    Update profile visibility
@@ -169,10 +179,11 @@ router.put('/visibility', authMiddleware, async (req, res) => {
 });
 
 // @route   PUT /api/users/update
-// @desc    Update user profile
+// @desc    Update user profile (requires OTP verification)
 // @access  Private
 router.put('/update', authMiddleware, async (req, res) => {
   try {
+    const { otp, ...updateData } = req.body;
     const allowedFields = [
       'fullName', 
       'username', 
@@ -183,7 +194,34 @@ router.put('/update', authMiddleware, async (req, res) => {
       'privacySettings'
     ];
 
-    const updates = pick(req.body, allowedFields);
+    // Validate OTP first
+    if (!otp) {
+      return res.status(400).json({ error: 'OTP is required for profile updates' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify OTP
+    const otpRecord = await OTPVerification.findOne({
+      email: user.email,
+      otp,
+      purpose: 'profile_update'
+    });
+
+    if (!otpRecord) {
+      return res.status(400).json({ error: 'Invalid OTP' });
+    }
+
+    if (otpRecord.expiresAt < new Date()) {
+      await OTPVerification.deleteOne({ _id: otpRecord._id });
+      return res.status(400).json({ error: 'OTP has expired' });
+    }
+
+    // Proceed with updates after OTP verification
+    const updates = pick(updateData, allowedFields);
 
     // Validate username uniqueness
     if (updates.username) {
@@ -201,7 +239,8 @@ router.put('/update', authMiddleware, async (req, res) => {
       }
     }
 
-    const user = await User.findByIdAndUpdate(
+    // Update user
+    const updatedUser = await User.findByIdAndUpdate(
       req.userId,
       { $set: updates },
       { 
@@ -211,11 +250,10 @@ router.put('/update', authMiddleware, async (req, res) => {
       }
     ).populate('followers following', 'username profileImage');
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    // Cleanup OTP after successful update
+    await OTPVerification.deleteOne({ _id: otpRecord._id });
 
-    res.json(user);
+    res.json(updatedUser);
   } catch (error) {
     console.error('Profile update error:', error);
     
@@ -544,6 +582,41 @@ router.put('/two-factor', authMiddleware, async (req, res) => {
   }
 });
 
+// In users.js routes
+router.post('/send-profile-update-otp', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    await OTPVerification.create({
+      email: user.email,
+      otp,
+      expiresAt,
+      purpose: 'profile_update'
+    });
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: process.env.EMAIL_PORT,
+      secure: process.env.EMAIL_SECURE === 'true',
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: user.email,
+      subject: 'Profile Update Verification',
+      text: `Your verification code is: ${otp}`
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Profile OTP error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
 
 module.exports = router;

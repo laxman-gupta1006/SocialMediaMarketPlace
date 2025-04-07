@@ -174,7 +174,7 @@ router.post(
   }
 );
 
-// Modified login route
+// Modified login route with failed login attempt tracking
 router.post(
   '/login',
   authLimiter,
@@ -184,21 +184,43 @@ router.post(
   ],
   async (req, res) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    if (!errors.isEmpty()) 
+      return res.status(400).json({ errors: errors.array() });
 
     try {
       const { username, password } = req.body;
       const user = await User.findOne({
         $or: [{ username }, { email: username }]
-      }).select('+password +verification.twoFactorEnabled');
+      }).select('+password +verification.twoFactorEnabled +failedLoginAttempts +lockUntil');
 
-      if (!user) return res.status(401).json({ error: 'Invalid credentials' });
-      if (user.status !== 'active') return res.status(403).json({ error: 'Account suspended' });
-      
+      if (!user) 
+        return res.status(401).json({ error: 'Invalid credentials' });
+
+      // Check if the account is currently locked
+      if (user.lockUntil && user.lockUntil > new Date()) {
+        return res.status(403).json({ 
+          error: 'Account locked due to multiple failed login attempts. Please try again after 24 hours.' 
+        });
+      }
+
       const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) return res.status(401).json({ error: 'Invalid credentials' });
+      if (!isMatch) {
+        // Increment the failed login attempts
+        user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+        // If failed attempts reach 3, lock account for 24 hours
+        if (user.failedLoginAttempts >= 3) {
+          user.lockUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        }
+        await user.save();
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
 
-      // Check if 2FA is enabled
+      // If login is successful, reset the failed attempts and lockUntil
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      await user.save();
+
+      // Check if 2FA is enabled. If yes, trigger OTP flow.
       if (user.verification.twoFactorEnabled) {
         const otp = generateOTP();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -210,7 +232,7 @@ router.post(
           purpose: '2fa'
         });
 
-        // Send OTP email
+        // Send OTP email using nodemailer
         const transporter = nodemailer.createTransport({
           host: process.env.EMAIL_HOST,
           port: process.env.EMAIL_PORT,
@@ -232,7 +254,7 @@ router.post(
         });
       }
 
-      // Regular login flow
+      // Regular login flow: generate JWT token if 2FA is not enabled
       const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
       res.cookie('token', token, {

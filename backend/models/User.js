@@ -90,61 +90,70 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-lastActive: {
-  type: Date,
-  default: Date.now
-},
-adminNotes: [{
-  content: String,
-  createdBy: {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    username: {
-      type: String,
-      required: true
-    },
-    profileImage: {
-      type: String,
-      default: ''
-    }
-  },
-  action: String,
-  timestamp: {
+  lastActive: {
     type: Date,
     default: Date.now
+  },
+  adminNotes: [{
+    content: String,
+    createdBy: {
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+      },
+      username: {
+        type: String,
+        required: true
+      },
+      profileImage: {
+        type: String,
+        default: ''
+      }
+    },
+    action: String,
+    timestamp: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  loginHistory: [{
+    ip: String,
+    device: String,
+    location: String,
+    timestamp: Date
+  }],
+  status: {
+    type: String,
+    enum: ['active', 'banned', 'suspended', 'deactivated'],
+    default: 'active'
+  },
+  roles: [{
+    type: String,
+    enum: ['user', 'admin'],
+    default: ['user']
+  }],
+  verification: {
+    emailVerified: Boolean,
+    phoneVerified: Boolean,
+    twoFactorEnabled: Boolean,
+    adminVerified: Boolean,
+    verificationRequested: { type: Boolean, default: false },
+    document: { type: String, default: '' }
+  },
+  banned: {
+    type: Boolean,
+    default: false
+  },
+  // New fields for login attempts
+  failedLoginAttempts: {
+    type: Number,
+    default: 0
+  },
+  lockUntil: {
+    type: Date,
+    default: null
   }
-}],
-loginHistory: [{
-  ip: String,
-  device: String,
-  location: String,
-  timestamp: Date
-}],
-status: {
-  type: String,
-  enum: ['active', 'banned', 'suspended', 'deactivated'],
-  default: 'active'
-},
-roles: [{
-  type: String,
-  enum: ['user', 'admin'],
-  default: ['user']
-}],
-verification: {
-  emailVerified: Boolean,
-  phoneVerified: Boolean,
-  twoFactorEnabled: Boolean,
-  adminVerified: Boolean,
-  verificationRequested: { type: Boolean, default: false },
-  document: { type: String, default: '' }
-},
-banned: {
-  type: Boolean,
-  default: false
-}
 }, {
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
@@ -157,7 +166,6 @@ userSchema.virtual('followersCount').get(function() {
 userSchema.virtual('followingCount').get(function() {
   return this.following ? this.following.length : 0;
 });
-
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {

@@ -718,4 +718,49 @@ router.put('/marketplace/purchases/:id/status',
   }
 );
 
+// Clear user account lock (reset failed login attempts and lockUntil)
+router.post('/users/:id/clear-lock',
+  authMiddleware,
+  requireAdmin,
+  hasPermission('manage_users'),
+  async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      // Clear the lock and reset failed attempts
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      await user.save();
+
+      res.json({ message: 'User lock cleared successfully' });
+    } catch (error) {
+      console.error('Clear lock error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
+// Reset admin verification flag for a user
+router.post('/users/:id/reset-admin-verification',
+  authMiddleware,
+  requireAdmin,
+  hasPermission('manage_users'),
+  async (req, res) => {
+    try {
+      const user = await User.findById(req.params.id);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      // Reset the admin verification flag
+      user.verification.adminVerified = false;
+      await user.save();
+
+      res.json({ message: 'Admin verification reset successfully' });
+    } catch (error) {
+      console.error('Reset admin verification error:', error);
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+);
+
 module.exports = router;
