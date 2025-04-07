@@ -14,7 +14,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import Logo from '../Logo';
 import axios from 'axios';
-import VirtualKeyboard from './VirtualKeyboard';
+import VirtualKeyboard from '../VirtualKeyboard';
 
 const steps = ['Enter Email', 'Reset Password'];
 

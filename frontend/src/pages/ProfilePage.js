@@ -15,7 +15,8 @@ const ProfilePage = () => {
   const [posts, setPosts] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const [error, setError] = useState(null);
+  const [profileError, setProfileError] = useState(null);
+  const [postsError, setPostsError] = useState(null);
   const { userId } = useParams(); // Get userId from URL params
 
   useEffect(() => {
@@ -26,44 +27,40 @@ const ProfilePage = () => {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
-
         if (!res.ok) {
           throw new Error('Failed to fetch user profile');
         }
-
         // Note: backend returns the user object directly, not wrapped in "user"
         const data = await res.json();
         setUserProfile(data);
       } catch (error) {
         console.error('Error fetching user profile:', error);
-        setError(error.message);
+        setProfileError(error.message);
       }
     };
 
     const fetchPosts = async () => {
       try {
         setLoadingPosts(true);
+        setPostsError(null);
         const res = await fetch(`${BACKEND_URL}/api/posts/user/${userId || currentUser._id}`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
-
         if (!res.ok) {
           const errorData = await res.json();
-          if (errorData.error === 'Profile is private') {
-            setError('This profile is private');
-          } else {
-            throw new Error(errorData.error || 'Failed to fetch posts');
-          }
-          return;
+          throw new Error(errorData.error || 'Failed to fetch posts');
         }
-
         const data = await res.json();
-        setPosts(data.posts);
+        if (data.isPrivate) {
+          setPostsError(data.message); // "This account is private..."
+        } else {
+          setPosts(data.posts);
+        }
       } catch (error) {
         console.error('Error fetching posts:', error);
-        setError(error.message);
+        setPostsError(error.message);
       } finally {
         setLoadingPosts(false);
       }
@@ -113,18 +110,14 @@ const ProfilePage = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
-
+  // If the profile fetch failed, you might want to show something here.
+  // But if you want to show the profile section regardless,
+  // you can choose to display a fallback or an error message only in the profile header.
+  // For now, we will continue rendering and simply log the error.
   if (!userProfile) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
-        <Typography>Loading profile...</Typography>
+        <Typography>{profileError ? profileError : 'Loading profile...'}</Typography>
       </Box>
     );
   }
@@ -164,6 +157,13 @@ const ProfilePage = () => {
         {loadingPosts ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
             <Typography>Loading posts...</Typography>
+          </Box>
+        ) : postsError ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography color="error">{postsError}</Typography>
+            {postsError.includes('private') && (
+              <Typography>This account is Private.</Typography>
+            )}
           </Box>
         ) : posts.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>

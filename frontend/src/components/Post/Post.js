@@ -75,7 +75,7 @@ const Post = ({ post, onLike, onComment, onReport }) => {
           <Avatar src={post.profileImage} sx={{ width: 32, height: 32 }} />
           <Link 
             component={RouterLink} 
-            to={`/user/${post.userId}`}
+            to={`/profile/${post.userId}`}
             sx={{ 
               ml: 2, 
               fontWeight: 600,
@@ -153,7 +153,7 @@ const Post = ({ post, onLike, onComment, onReport }) => {
         <Typography variant="body2" sx={{ mb: 1 }}>
           <Link 
             component={RouterLink} 
-            to={`/user/${post.userId}`}
+            to={`/profile/${post.userId}`}
             sx={{ 
               fontWeight: 600,
               textDecoration: 'none',
@@ -173,13 +173,13 @@ const Post = ({ post, onLike, onComment, onReport }) => {
       src={comment.profileImage} 
       sx={{ width: 24, height: 24 }}
       component={RouterLink}
-      to={`/user/${comment.userId}`}
+      to={`/profile/${comment.userId}`}
     />
     <Box>
       <Typography variant="body2">
         <Link 
           component={RouterLink} 
-          to={`/user/${comment.userId}`}
+          to={`/profile/${comment.userId}`}
           sx={{ 
             fontWeight: 600,
             textDecoration: 'none',

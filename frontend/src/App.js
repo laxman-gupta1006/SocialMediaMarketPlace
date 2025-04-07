@@ -1,7 +1,7 @@
 // App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme, Box, Typography } from '@mui/material';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { CssBaseline, ThemeProvider, createTheme, Box, Typography, Button } from '@mui/material';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import MainPage from './pages/MainPage';
@@ -50,7 +50,6 @@ const AdminRoute = ({ children }) => {
 };
 
 // VerifiedRoute ensures the feature is only available for verified users.
-// If not verified, a message is displayed instead.
 const VerifiedRoute = ({ children }) => {
   const { user } = useAuth();
   return user?.verification?.adminVerified ? (
@@ -65,7 +64,7 @@ const VerifiedRoute = ({ children }) => {
 };
 
 const App = () => {
-  const { user, loading , error } = useAuth();
+  const { user, loading, error } = useAuth();
 
   if (loading) return <Loading />;
 
@@ -84,10 +83,68 @@ const App = () => {
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', pb: '72px' }}>
         {/* Banner shown on top when user is not verified */}
         {user && !user.verification?.adminVerified && (
-          <Box sx={{ backgroundColor: '#ff9800', p: 1, textAlign: 'center' }}>
-            <Typography variant="body1" color="white">
-              Your account is not verified by an admin. Chats and Marketplace are restricted.
+          <Box
+            sx={{
+              background: 'linear-gradient(to right, #ff7043, #ff9800)',
+              color: 'white',
+              p: 3,
+              borderRadius: 3,
+              textAlign: 'center',
+              boxShadow: 4,
+              mb: 3,
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
+              🚫 Your Account is Not Admin Verified
             </Typography>
+
+            <Typography variant="body1" sx={{ mb: 1.5 }}>
+              Access to <strong>Chats</strong> and <strong>Marketplace</strong> is currently <span style={{ textDecoration: 'underline' }}>restricted</span>.
+            </Typography>
+
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              📄 You can <strong>request verification</strong> or update your profile from your <em>Profile Settings</em>.
+            </Typography>
+
+            {!user.verification?.twoFactorEnabled && (
+              <Typography variant="body2" sx={{ mt: 2, backgroundColor: '#fff3cd', color: '#856404', p: 1.5, borderRadius: 2 }}>
+                🔐 <strong>Security Alert:</strong> Enable <strong>Two-Factor Authentication</strong> to protect your account.
+              </Typography>
+            )}
+
+            <Box sx={{ mt: 3 }}>
+              <a href="/settings/profile" style={{ textDecoration: 'none' }}>
+                <Box
+                  component="button"
+                  sx={{
+                    backgroundColor: '#ffffff',
+                    color: '#ff7043',
+                    fontWeight: 'bold',
+                    px: 3,
+                    py: 1,
+                    borderRadius: 2,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: 2,
+                    transition: 'all 0.3s ease-in-out',
+                    '&:hover': {
+                      backgroundColor: '#ffe0b2',
+                    },
+                  }}
+                >
+                  Go to Profile Settings
+                </Box>
+              </a>
+            </Box>
+          </Box>
+        )}
+
+        {/* Show Admin Panel button if user is an admin */}
+        {user && user.roles?.includes('admin') && (
+          <Box sx={{ position: 'fixed', top: 16, right: 16, zIndex: 2000 }}>
+            <Button variant="contained" color="secondary" component={Link} to="/admin">
+              Admin Panel
+            </Button>
           </Box>
         )}
 
@@ -106,7 +163,8 @@ const App = () => {
               </AdminRoute>
             }
           />
-      <Route
+
+          <Route
             path="/profile/:userId?"
             element={
               <ProtectedRoute>
@@ -115,6 +173,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
           {/* Protected User Routes */}
           <Route
             path="/"
@@ -125,7 +184,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
-    
+
           <Route
             path="/new-post"
             element={
@@ -135,6 +194,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/messages"
             element={
@@ -146,6 +206,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/search"
             element={
@@ -155,6 +216,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/marketplace"
             element={
@@ -166,6 +228,7 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
           <Route path="/error/server-down" element={<ServerDownPage />} />
           {/* Fallback Route */}
           {/* <Route path="*" element={<NotFoundPage />} /> */}

@@ -28,7 +28,6 @@ const [selectedMedia,setSelectedMedia]=useState(null);
 const [selectedMediaFile,setSelectedMediaFile]=useState(null);
 const [caption,setCaption]=useState('');
 const [isLoading,setIsLoading]=useState(false);
-const [visibility,setVisibility]=useState('public');
 const [error,setError]=useState('');
 const [success,setSuccess]=useState('');
 
@@ -61,7 +60,6 @@ try{
 const formData=new FormData();
 formData.append('media',selectedMediaFile);
 formData.append('caption',caption);
-formData.append('visibility',visibility);
 const response=await fetch(`${BACKEND_URL}/api/posts`,{
 method:'POST',
 credentials:'include',
@@ -75,7 +73,6 @@ setSuccess('Post created successfully!');
 setSelectedMedia(null);
 setSelectedMediaFile(null);
 setCaption('');
-setVisibility('public');
 }catch(err){
 setError(err.message);
 }finally{
@@ -170,7 +167,7 @@ sx={{ mt: 3 }}
 disabled={isLoading}
 />
 
-<FormControl fullWidth sx={{ mt: 2 }}>
+{/* <FormControl fullWidth sx={{ mt: 2 }}>
 <InputLabel>Visibility</InputLabel>
 <Select
 value={visibility}
@@ -181,7 +178,7 @@ disabled={isLoading}
 <MenuItem value="public">🌍 Public (Visible to everyone)</MenuItem>
 <MenuItem value="private">🔒 Private (Followers only)</MenuItem>
 </Select>
-</FormControl>
+</FormControl> */}
 
 <Button
 fullWidth

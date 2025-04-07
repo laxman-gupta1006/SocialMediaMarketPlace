@@ -18,7 +18,7 @@ import { Link } from 'react-router-dom';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Settings from './Settings';
 import { useAuth } from '../../context/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 
 const BACKEND_URL = 'https://192.168.2.250:3000';
@@ -27,8 +27,22 @@ const ProfileHeader = ({ user, onEditClick }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
   const [followingOpen, setFollowingOpen] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
   const { user: currentUser } = useAuth();
   const { userId } = useParams();
+
+  // Update follow state when user prop or currentUser changes
+  useEffect(() => {
+    if (user && currentUser) {
+      const following = user.followers?.some(
+        (follower) =>
+          follower.userId.toString() === currentUser._id.toString()
+      );
+      setIsFollowing(following);
+      setFollowersCount(user.followers?.length || 0);
+    }
+  }, [user, currentUser]);
 
   if (!user) {
     return (
@@ -45,6 +59,36 @@ const ProfileHeader = ({ user, onEditClick }) => {
   const profileImageUrl = user.profileImage?.startsWith('http') 
     ? user.profileImage 
     : `${BACKEND_URL}${user.profileImage}`;
+
+  // Toggle follow status by calling follow/unfollow endpoints
+  const handleFollowToggle = async () => {
+    if (!currentUser) return;
+    try {
+      if (isFollowing) {
+        // Unfollow user
+        const response = await fetch(
+          `${BACKEND_URL}/api/users/unfollow/${user._id}`,
+          { method: 'POST', credentials: 'include' }
+        );
+        if (!response.ok) throw new Error('Failed to unfollow user');
+        const data = await response.json();
+        setIsFollowing(false);
+        setFollowersCount(data.followersCount || followersCount - 1);
+      } else {
+        // Follow user
+        const response = await fetch(
+          `${BACKEND_URL}/api/users/follow/${user._id}`,
+          { method: 'POST', credentials: 'include' }
+        );
+        if (!response.ok) throw new Error('Failed to follow user');
+        const data = await response.json();
+        setIsFollowing(true);
+        setFollowersCount(data.followersCount || followersCount + 1);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <>
@@ -87,9 +131,10 @@ const ProfileHeader = ({ user, onEditClick }) => {
               ) : (
                 <Button 
                   variant="contained" 
+                  onClick={handleFollowToggle}
                   sx={{ textTransform: 'none', px: 3 }}
                 >
-                  Follow
+                  {isFollowing ? 'Unfollow' : 'Follow'}
                 </Button>
               )}
             </div>
@@ -102,7 +147,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
                 onClick={() => setFollowersOpen(true)} 
                 sx={{ cursor: 'pointer' }}
               >
-                <strong>{user.followers?.length || 0}</strong> followers
+                <strong>{followersCount}</strong> followers
               </Typography>
               <Typography 
                 onClick={() => setFollowingOpen(true)} 

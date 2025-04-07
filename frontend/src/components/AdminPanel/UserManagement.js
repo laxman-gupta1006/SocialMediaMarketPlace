@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { 
   Block, CheckCircle, AdminPanelSettings, Edit, 
-  Visibility, Cancel, AssignmentInd 
+  Visibility, Cancel, AssignmentInd, LockOpen, RestartAlt
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import config from '../../Config/config';
@@ -19,6 +19,7 @@ const BACKEND_URL = config.BACKEND_URL;
 
 const UserManagement = () => {
   const [activeTab, setActiveTab] = useState(0);
+  const [verifyResult, setVerifyResult] = useState('');
   const [users, setUsers] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState({ users: false, logs: false });
@@ -87,6 +88,23 @@ const UserManagement = () => {
 
     if (activeTab === 1) fetchLogs();
   }, [activeTab]);
+
+  const handleVerifyLogs = async () => {
+    try {
+      setLoading(prev => ({ ...prev, logs: true }));
+      const response = await fetch(`${BACKEND_URL}/api/admin/logs/verify`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Log verification failed');
+      const result = await response.json();
+      setVerifyResult(result.message || 'Logs verified successfully');
+      setSuccess(result.message || 'Logs verified successfully');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(prev => ({ ...prev, logs: false }));
+    }
+  };
 
   const handleUserAction = async (userId, action) => {
     try {
@@ -187,6 +205,50 @@ const UserManagement = () => {
         } : user
       ));
       setSuccess('Admin demoted successfully');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(prev => ({ ...prev, users: false }));
+    }
+  };
+
+  // New function: Clear the login lock for a user
+  const handleClearLock = async (userId) => {
+    try {
+      setLoading(prev => ({ ...prev, users: true }));
+      const response = await fetch(
+        `${BACKEND_URL}/api/admin/users/${userId}/clear-lock`,
+        { method: 'POST', credentials: 'include' }
+      );
+      if (!response.ok) throw new Error('Failed to clear lock');
+      setUsers(users.map(user => 
+        user._id === userId 
+          ? { ...user, failedLoginAttempts: 0, lockUntil: null } 
+          : user
+      ));
+      setSuccess('User lock cleared successfully');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(prev => ({ ...prev, users: false }));
+    }
+  };
+
+  // New function: Reset admin verification flag for a user
+  const handleResetAdminVerification = async (userId) => {
+    try {
+      setLoading(prev => ({ ...prev, users: true }));
+      const response = await fetch(
+        `${BACKEND_URL}/api/admin/users/${userId}/reset-admin-verification`,
+        { method: 'POST', credentials: 'include' }
+      );
+      if (!response.ok) throw new Error('Failed to reset admin verification');
+      setUsers(users.map(user => 
+        user._id === userId 
+          ? { ...user, verification: { ...user.verification, adminVerified: false } } 
+          : user
+      ));
+      setSuccess('Admin verification reset successfully');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -313,6 +375,16 @@ const UserManagement = () => {
                                 <Cancel />
                               </IconButton>
                             </Tooltip>
+                            {user.verification && user.verification.adminVerified && (
+                              <Tooltip title="Reset Admin Verification">
+                                <IconButton
+                                  color="secondary"
+                                  onClick={() => handleResetAdminVerification(user._id)}
+                                >
+                                  <RestartAlt />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           </>
                         ) : (
                           <Tooltip title="Promote to Admin">
@@ -324,6 +396,17 @@ const UserManagement = () => {
                               }}
                             >
                               <AdminPanelSettings />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+
+                        {(user.failedLoginAttempts > 0 || user.lockUntil) && (
+                          <Tooltip title="Clear Lock">
+                            <IconButton
+                              color="info"
+                              onClick={() => handleClearLock(user._id)}
+                            >
+                              <LockOpen />
                             </IconButton>
                           </Tooltip>
                         )}
@@ -344,7 +427,18 @@ const UserManagement = () => {
         </>
       )}
 
-      {activeTab === 1 && (
+      {activeTab === 1 && (<>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, mb: 1 }}>
+          <Button 
+            variant="contained" 
+            onClick={handleVerifyLogs}
+            disabled={loading.logs}
+            startIcon={<CheckCircle />}
+          >
+            Verify Logs
+          </Button>
+        </Box>
+      
         <TableContainer component={Paper} sx={{ mt: 3 }}>
           {loading.logs && <LinearProgress />}
           <Table>
@@ -378,6 +472,7 @@ const UserManagement = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        </>
       )}
 
       {activeTab === 2 && (
