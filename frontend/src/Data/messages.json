@@ -34,7 +34,7 @@
       },
       {
         "id": 2,
-        "name": "John Doe",
+        "name": "John Doe something",
         "isGroup": false,
         "avatar": "/images/john.jpg",
         "lastMessage": "Thanks for the feedback!",

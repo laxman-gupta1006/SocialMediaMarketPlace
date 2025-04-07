@@ -8,13 +8,16 @@ const mongoSanitize = require('express-mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
+require('./config/dbConfig');
+require('dotenv').config();
+
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const postsRoutes = require('./routes/posts');
 const marketplaceRoutes = require('./routes/marketplace');
 const adminRoutes= require('./routes/admin');
 const verificationRoutes = require('./routes/verification');
-require('./config/dbConfig');
+const messagesRoutes = require('./routes/messages');
 
 const app = express();
 
@@ -67,13 +70,13 @@ app.use(cors({
 
 // 6. Static Files Configuration (CRUCIAL FOR IMAGES)
 const uploadsDir = path.join(__dirname, 'uploads');
-// Create uploads directory if it doesn't exist
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 app.use('/uploads', express.static(uploadsDir, {
   setHeaders: (res, filePath) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     if (filePath.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
       res.setHeader('Cache-Control', 'public, max-age=86400');
 +      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -93,6 +96,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
 
 // 8. Global error handling middleware
+app.use('/api/messages', messagesRoutes);
+
+// 6. Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
@@ -102,7 +108,6 @@ app.use((err, req, res, next) => {
 const sslOptions = {
   key: fs.readFileSync(path.join(__dirname, 'certs', 'server.key')),
   cert: fs.readFileSync(path.join(__dirname, 'certs', 'server.cert')),
-  // For additional security:
   minVersion: 'TLSv1.2',
   ciphers: [
     'ECDHE-ECDSA-AES256-GCM-SHA384',
@@ -112,10 +117,16 @@ const sslOptions = {
   honorCipherOrder: true
 };
 
-// 10. Create and start the HTTPS server
+// 8. Create HTTPS Server
 const server = https.createServer(sslOptions, app);
+
+// 9. Initialize socket.io using external socket.js
+const { initSocket } = require('./socket');
+initSocket(server, allowedOrigins); // Sets up and manages socket events
+
+// 10. Start server
 const PORT = 3000;
-const HOST = '192.168.2.250'; // Using your specific IP
+const HOST = '192.168.2.250';
 
 server.listen(PORT, HOST, () => {
   console.log(`Secure server running on https://${HOST}:${PORT}`);

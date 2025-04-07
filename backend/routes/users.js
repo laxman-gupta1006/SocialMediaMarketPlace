@@ -285,7 +285,64 @@ router.get('/search', authMiddleware, async (req, res) => {
 });
 
 
-// Updated follow route with error handling
+// // Updated follow route with error handling
+// router.post('/follow/:userId', authMiddleware, async (req, res) => {
+//   try {
+//     const targetUser = await User.findById(req.params.userId).lean();
+//     const currentUser = await User.findById(req.userId);
+
+//     if (!targetUser || !currentUser) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
+
+//     // Ensure following array exists
+//     if (!Array.isArray(currentUser.following)) {
+//       currentUser.following = [];
+//     }
+//     // Check if already following (prevent undefined userId errors)
+//     const isAlreadyFollowing = currentUser.following.some((followingUser) => {
+//       return followingUser?.userId && followingUser.userId.toString() === req.params.userId;
+//     });
+//     if (isAlreadyFollowing) {
+//       return res.status(400).json({ error: 'Already following this user' });
+//     }
+//     // Add to current user's following list
+//     await User.findByIdAndUpdate(req.userId, {
+//       $addToSet: {
+//         following: {
+//           userId: targetUser._id,
+//           username: targetUser.username,
+//           profileImage: targetUser.profileImage,
+//         },
+//       },
+//     });
+
+//     // Add to target user's followers list
+//     await User.findByIdAndUpdate(targetUser._id, {
+//       $addToSet: {
+//         followers: {
+//           userId: currentUser._id,
+//           username: currentUser.username,
+//           profileImage: currentUser.profileImage,
+//         },
+//       },
+//     });
+
+//     const updatedUser = await User.findById(targetUser._id).lean();
+//     res.json({
+//       success: true,
+//       followersCount: updatedUser?.followers?.length || 0,
+//       isFollowing: true,
+//     });
+//   } catch (error) {
+//     console.error('Follow error:', error);
+//     res.status(500).json({ error: 'Failed to follow user' });
+//   }
+// });
+
+
+const Chat = require('../models/Chat'); // Make sure path is correct
+
 router.post('/follow/:userId', authMiddleware, async (req, res) => {
   try {
     const targetUser = await User.findById(req.params.userId).lean();
@@ -295,18 +352,19 @@ router.post('/follow/:userId', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Ensure following array exists
     if (!Array.isArray(currentUser.following)) {
       currentUser.following = [];
     }
-    // Check if already following (prevent undefined userId errors)
-    const isAlreadyFollowing = currentUser.following.some((followingUser) => {
-      return followingUser?.userId && followingUser.userId.toString() === req.params.userId;
+
+    const isAlreadyFollowing = currentUser.following.some((u) => {
+      return u?.userId?.toString() === req.params.userId;
     });
+
     if (isAlreadyFollowing) {
       return res.status(400).json({ error: 'Already following this user' });
     }
-    // Add to current user's following list
+
+    // Update following and followers
     await User.findByIdAndUpdate(req.userId, {
       $addToSet: {
         following: {
@@ -317,7 +375,6 @@ router.post('/follow/:userId', authMiddleware, async (req, res) => {
       },
     });
 
-    // Add to target user's followers list
     await User.findByIdAndUpdate(targetUser._id, {
       $addToSet: {
         followers: {
@@ -328,7 +385,25 @@ router.post('/follow/:userId', authMiddleware, async (req, res) => {
       },
     });
 
+    // Check if a 1-on-1 chat already exists
+    const existingChat = await Chat.findOne({
+      isGroup: false,
+      participants: {
+        $all: [currentUser._id, targetUser._id],
+        $size: 2,
+      },
+    });
+
+    // If chat doesn't exist, create it
+    if (!existingChat) {
+      await Chat.create({
+        isGroup: false,
+        participants: [currentUser._id, targetUser._id],
+      });
+    }
+
     const updatedUser = await User.findById(targetUser._id).lean();
+
     res.json({
       success: true,
       followersCount: updatedUser?.followers?.length || 0,
@@ -339,6 +414,7 @@ router.post('/follow/:userId', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Failed to follow user' });
   }
 });
+
 
 // Updated unfollow route
 router.post('/unfollow/:userId', authMiddleware, async (req, res) => {

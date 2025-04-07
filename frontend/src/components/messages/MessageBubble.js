@@ -1,45 +1,79 @@
-import { Box, Typography, Avatar, Chip } from '@mui/material';
-import { InsertDriveFile, Image, Schedule, DoneAll } from '@mui/icons-material';
+import React from 'react';
+import { Box, Typography, Link } from '@mui/material';
 
-const MessageBubble = ({ message, isGroup }) => (
-  <Box
-    sx={{
-      width: '100%',
-      display: 'flex',
-      justifyContent: message.sender === 'me' ? 'flex-end' : 'flex-start',
-      mb: 1,
-    }}
-  >
-    <Box sx={{ display: 'flex', gap: 1, maxWidth: '75%' }}>
-      {isGroup && message.sender !== 'me' && (
-        <Avatar sx={{ width: 32, height: 32 }} />
+const MessageBubble = ({ message, currentUserId, isGroup }) => {
+  if (!message) return null;
+
+  const senderId = message?.sender?._id || message?.sender || '';
+  const isOwnMessage = senderId === currentUserId;
+  const senderName = message?.sender?.username?.toLowerCase() || 'unknown';
+
+  const isPicture = message.type === 'picture';
+  const isFile = message.type === 'file';
+
+  const fileUrl = message.text.startsWith('http') 
+    ? message.text 
+    : `https://localhost:3000${message.text}`;
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: isOwnMessage ? 'flex-end' : 'flex-start',
+        mb: 1,
+      }}
+    >
+      {!isOwnMessage && isGroup && (
+        <Typography sx={{ fontSize: '0.7rem', color: '#888', mb: 0.3 }}>
+          {senderName}
+        </Typography>
       )}
-      <Box
-        sx={{
-          bgcolor: message.sender === 'me' ? 'primary.main' : 'grey.100',
-          color: message.sender === 'me' ? 'common.white' : 'text.primary',
-          p: 2,
-          borderRadius: 4,
-          boxShadow: 1,
-        }}
-      >
-        {message.attachments?.map((attachment) => (
-          <Chip
-            key={attachment.url}
-            icon={attachment.type === 'image' ? <Image /> : <InsertDriveFile />}
-            label={attachment.name || 'Image'}
-            sx={{ mb: 1, bgcolor: 'rgba(255,255,255,0.1)' }}
-          />
-        ))}
-        <Typography variant="body1">{message.text}</Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
-          <Schedule fontSize="small" />
-          <Typography variant="caption">{message.timestamp}</Typography>
-          {message.sender === 'me' && <DoneAll fontSize="small" />}
-        </Box>
-      </Box>
+
+      {/* 🖼️ Render Image */}
+      {isPicture ? (
+        <img
+          src={fileUrl}
+          alt="Sent media"
+          style={{
+            maxWidth: '60%',
+            borderRadius: '8px',
+            border: '1px solid #ddd',
+          }}
+        />
+      ) : isFile ? (
+        <Link
+          href={fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          sx={{
+            backgroundColor: isOwnMessage ? 'blue' : 'gray',
+            color: 'white',
+            p: 1,
+            borderRadius: '8px',
+            maxWidth: '60%',
+            textDecoration: 'none',
+            wordBreak: 'break-word',
+          }}
+        >
+          📎 Download File
+        </Link>
+      ) : (
+        <Typography
+          sx={{
+            backgroundColor: isOwnMessage ? 'blue' : 'gray',
+            color: 'white',
+            p: 1,
+            borderRadius: '8px',
+            maxWidth: '60%',
+            wordBreak: 'break-word',
+          }}
+        >
+          {message.text}
+        </Typography>
+      )}
     </Box>
-  </Box>
-);
+  );
+};
 
 export default MessageBubble;
