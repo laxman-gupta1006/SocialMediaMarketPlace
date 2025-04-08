@@ -1,7 +1,7 @@
 // components/Marketplace/ListedItems.js
 import React, { useState, useEffect } from 'react';
 import { Grid, Typography, CircularProgress, Card, CardContent, CardMedia, Chip, Button,Box } from '@mui/material';
-import config from '../../Config/config';
+
 const ListedItems = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,7 +9,7 @@ const ListedItems = () => {
   useEffect(() => {
     const fetchListings = async () => {
       try {
-        const response = await fetch(`${config.BACKEND_URL}/api/marketplace/my-listings`, {
+        const response = await fetch(`/api/marketplace/my-listings`, {
           credentials: 'include'
         });
         const data = await response.json();
@@ -42,7 +42,7 @@ const ListedItems = () => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={"https://192.168.2.250:3000/"+product.images[0]}
+                  image={"/api/"+product.images[0]}
                   alt={product.title}
                 />
                 <CardContent>

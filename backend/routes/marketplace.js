@@ -194,7 +194,7 @@ router.get('/search', auth, requireAdminVerified, async (req, res) => {
     ]);
 
     // Convert image paths to full URLs
-    const baseUrl = `https://192.168.2.250:3000`;
+    const baseUrl = `/api`;
 // In your search route's projection
 const processedProducts = products.map(product => ({
   ...product,

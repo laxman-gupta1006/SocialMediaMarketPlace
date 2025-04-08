@@ -12,14 +12,7 @@ const messageSchema = new mongoose.Schema({
       url: { type: String },
       name: { type: String }
     }
-  ],
-  media: {
-    encryptedData: String,  // Base64 encoded encrypted binary
-    iv: String,             // Initialization Vector for AES
-    type: String,           // 'image' or 'file'
-    mimeType: String,       // Original file type
-    fileName: String        // Original file name
-  }
+  ]
 });
 
 const Message = mongoose.model("Message", messageSchema);

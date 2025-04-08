@@ -84,7 +84,7 @@ const MessagesPage = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch('https://192.168.2.250:3000/api/auth/me', { credentials: 'include' });
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
         const data = await res.json();
         if (data?._id) setCurrentUserId(data._id);
         setInitialLoading(false);
@@ -111,7 +111,7 @@ const MessagesPage = () => {
         console.log("🔑 Public Key (PEM):\n", publicKeyPem);
         console.log("🔒 Private Key (PEM):\n", privateKeyPem);
 
-        const res = await fetch('https://192.168.2.250:3000/api/messages/exchange-key', {
+        const res = await fetch('/api/messages/exchange-key', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -144,14 +144,14 @@ const MessagesPage = () => {
   useEffect(() => {
     if (!currentUserId) return;
 
-    socket.current = io('https://192.168.2.250:3000', { withCredentials: true });
+    socket.current = io('/api/', { withCredentials: true });
 
     socket.current.emit('join', currentUserId);
 
     socket.current.on('newMessage', (chatId) => {
       if (selectedChat?.chatId === chatId) {
         const fetchAndUpdateMessages = () => {
-          fetch(`https://192.168.2.250:3000/api/messages/get-messages?chatId=${chatId}`, {
+          fetch(`/api/messages/get-messages?chatId=${chatId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
@@ -173,7 +173,7 @@ const MessagesPage = () => {
         };
         
         // Add delay only if last message is an image
-        fetch(`https://192.168.2.250:3000/api/messages/get-messages?chatId=${chatId}`, {
+        fetch(`/api/messages/get-messages?chatId=${chatId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'
@@ -202,7 +202,7 @@ const MessagesPage = () => {
   const loadConversations = async () => {
     setLoadingConversations(true);
     try {
-      const res = await fetch('https://192.168.2.250:3000/api/messages/my-chats', {
+      const res = await fetch('/api/messages/my-chats', {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include'
@@ -251,7 +251,7 @@ const MessagesPage = () => {
     const loadMessages = async () => {
       setLoadingMessages(true);
       try {
-        const res = await fetch(`https://192.168.2.250:3000/api/messages/get-messages?chatId=${selectedChat.chatId}`, {
+        const res = await fetch(`/api/messages/get-messages?chatId=${selectedChat.chatId}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'
@@ -310,7 +310,7 @@ const MessagesPage = () => {
       console.log("Encrypted (Base64):", encryptedBase64);
       console.log("IV (Base64):", ivBase64);
       // 4. Send encrypted message to server
-      const res = await fetch('https://192.168.2.250:3000/api/messages/send-message', {
+      const res = await fetch('/api/messages/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -345,7 +345,7 @@ const MessagesPage = () => {
     const formData = new FormData();
     formData.append('image', file);
     formData.append('chatId', selectedChat.chatId);
-    fetch('https://192.168.2.250:3000/api/messages/send-message', {
+    fetch('/api/messages/send-message', {
       method: 'POST',
       credentials: 'include',
       body: formData
@@ -374,7 +374,7 @@ const MessagesPage = () => {
       participantIds: selectedUsers
     };
 
-    fetch('https://192.168.2.250:3000/api/messages/addgroup', {
+    fetch('/api/messages/addgroup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',

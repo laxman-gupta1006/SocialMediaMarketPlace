@@ -34,7 +34,7 @@ const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
         <Mood />
       </IconButton> */}
 
-      {/* <IconButton component="label">
+      <IconButton component="label">
         <AttachFile />
         <input
           ref={fileInputRef}
@@ -43,7 +43,7 @@ const MessageInput = ({ value, onChange, onSend, onFileUpload }) => {
           hidden
           onChange={handleFileChange}
         />
-      </IconButton> */}
+      </IconButton>
 
       <TextField
         fullWidth

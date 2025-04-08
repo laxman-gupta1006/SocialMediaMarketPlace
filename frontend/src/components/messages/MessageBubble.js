@@ -13,7 +13,7 @@ const MessageBubble = ({ message, currentUserId, isGroup }) => {
 
   const fileUrl = message.text.startsWith('http') 
     ? message.text 
-    : `https://localhost:3000${message.text}`;
+    : `https://192.168.2.250:3000/${message.text}`;
 
   return (
     <Box

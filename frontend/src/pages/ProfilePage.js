@@ -4,10 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import EditProfileDialog from '../components/Profile/EditProfile';
 import ProfileHeader from '../components/Profile/ProfileHeader';
 import ProfilePost from '../components/Profile/ProfilePost';
-import config from '../Config/config';
 import { useParams } from 'react-router-dom';
-
-const BACKEND_URL = config.BACKEND_URL;
 
 const ProfilePage = () => {
   const { user: currentUser, loading: authLoading, checkAuth } = useAuth();
@@ -22,7 +19,7 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/users/user/${userId || currentUser._id}`, {
+        const res = await fetch(`/api/users/user/${userId || currentUser._id}`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -43,7 +40,7 @@ const ProfilePage = () => {
       try {
         setLoadingPosts(true);
         setPostsError(null);
-        const res = await fetch(`${BACKEND_URL}/api/posts/user/${userId || currentUser._id}`, {
+        const res = await fetch(`/api/posts/user/${userId || currentUser._id}`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
@@ -74,7 +71,7 @@ const ProfilePage = () => {
 
   const handleSaveProfile = async (updatedData) => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/users/update`, {
+      const res = await fetch(`/api/users/update`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

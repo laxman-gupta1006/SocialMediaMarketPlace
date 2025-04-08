@@ -18,7 +18,7 @@ function secureUrl(path) {
   }
   
   // For development, use your explicit backend URL
-  return `https://192.168.2.250:3000${path}`;
+  return `/{path}`;
 }
 
 // Configure secure file uploads
@@ -85,8 +85,8 @@ router.post('/', authMiddleware, upload.single('media'), async (req, res) => {
       _id: newPost._id,
       userId: newPost.userId._id,
       username: newPost.userId.username,
-      profileImage: "https://192.168.2.250:3000"+newPost.userId.profileImage,
-      media: "https://192.168.2.250:3000"+newPost.media,
+      profileImage: newPost.userId.profileImage,
+      media: "/api"+newPost.media,
       mediaType: newPost.mediaType,
       caption: newPost.caption,
       likes: newPost.likes,
@@ -94,7 +94,7 @@ router.post('/', authMiddleware, upload.single('media'), async (req, res) => {
         _id: comment._id,
         userId: comment.userId,
         username: comment.username,
-        profileImage: "https://192.168.2.250:3000"+comment.profileImage,
+        profileImage: "/api"+comment.profileImage,
         text: comment.text,
         createdAt: comment.createdAt
       })),
@@ -142,9 +142,9 @@ router.get('/', authMiddleware, async (req, res) => {
       userId: post.userId._id,
       username: post.userId.username,
       profileImage: post.userId.profileImage 
-        ? "https://192.168.2.250:3000" + post.userId.profileImage 
+        ? "/api" + post.userId.profileImage 
         : null,
-      media: "https://192.168.2.250:3000" + post.media,
+      media: "/api" + post.media,
       mediaType: post.mediaType,
       caption: post.caption,
       likes: post.likes,
@@ -153,7 +153,7 @@ router.get('/', authMiddleware, async (req, res) => {
         userId: comment.userId,
         username: comment.username,
         profileImage: comment.profileImage 
-          ? "https://192.168.2.250:3000" + comment.profileImage 
+          ? "/api" + comment.profileImage 
           : null,
         text: comment.text,
         createdAt: comment.createdAt
@@ -205,10 +205,10 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
           userId: post.userId?._id?.toString(),
           username: post.userId?.username || 'Unknown User',
           profileImage: post.userId?.profileImage 
-            ? `https://192.168.2.250:3000${post.userId.profileImage}` 
+            ? `/api${post.userId.profileImage}` 
             : '/default-profile.png',
           media: post.media 
-            ? `https://192.168.2.250:3000${post.media}` 
+            ? `/api${post.media}` 
             : '/default-media.png',
           mediaType: post.mediaType || 'image',
           caption: post.caption || '',
@@ -218,7 +218,7 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
             userId: comment.userId?.toString(),
             username: comment.username || 'Unknown User',
             profileImage: comment.profileImage 
-              ? `https://192.168.2.250:3000${comment.profileImage}` 
+              ? `/api${comment.profileImage}` 
               : '/default-profile.png',
             text: comment.text || '',
             createdAt: comment.createdAt
@@ -329,7 +329,7 @@ router.post('/comment/:postId', authMiddleware, async (req, res) => {
           comments: {
             userId: req.userId,
             username: user.username,
-            profileImage: "https://192.168.2.250:3000"+user.profileImage,
+            profileImage: "/api"+user.profileImage,
             text: sanitizedText,
             createdAt: new Date()
           }
@@ -348,7 +348,7 @@ router.post('/comment/:postId', authMiddleware, async (req, res) => {
       _id: newComment._id,
       userId: newComment.userId,
       username: newComment.username,
-      profileImage: "https://192.168.2.250:3000"+newComment.profileImage,
+      profileImage: "/api"+newComment.profileImage,
       text: newComment.text,
       createdAt: newComment.createdAt
     });

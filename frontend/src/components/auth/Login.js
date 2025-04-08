@@ -13,9 +13,7 @@ import { Google } from '@mui/icons-material';
 import Logo from '../Logo';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import config from '../../Config/config';
 
-const BACKEND_URL = config.BACKEND_URL || 'https://192.168.2.250:3000';
 
 const Login = () => {
   const [formData, setFormData] = useState({ username: '', password: '' });
@@ -33,7 +31,7 @@ const Login = () => {
     setError('');
     try {
       // Send login request to the backend
-      const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
+      const response = await fetch(`/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -69,7 +67,7 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${BACKEND_URL}/api/auth/verify-2fa`, {
+      const response = await fetch(`/api/auth/verify-2fa`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

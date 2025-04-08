@@ -12,9 +12,6 @@ import {
   ShoppingCart, Category, Store,CheckCircle
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import config from '../../Config/config';
-
-const BACKEND_URL = config.BACKEND_URL;
 
 const MarketplaceAdmin = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -60,7 +57,7 @@ const MarketplaceAdmin = () => {
           maxPrice: filters.priceRange[1]
         }).toString();
         
-        const response = await fetch(`${BACKEND_URL}/api/admin/marketplace/products?${query}`, {
+        const response = await fetch(`/api/admin/marketplace/products?${query}`, {
           credentials: 'include'
         });
         
@@ -89,7 +86,7 @@ const MarketplaceAdmin = () => {
           status: filters.status
         }).toString();
         
-        const response = await fetch(`${BACKEND_URL}/api/admin/marketplace/purchases?${query}`, {
+        const response = await fetch(`/api/admin/marketplace/purchases?${query}`, {
           credentials: 'include'
         });
         
@@ -111,7 +108,7 @@ const MarketplaceAdmin = () => {
     try {
       setLoading(prev => ({ ...prev, products: true }));
       const response = await fetch(
-        `${BACKEND_URL}/api/admin/marketplace/products/${productId}`,
+        `/api/admin/marketplace/products/${productId}`,
         { method: 'DELETE', credentials: 'include' }
       );
       
@@ -129,7 +126,7 @@ const MarketplaceAdmin = () => {
     try {
       setLoading(prev => ({ ...prev, purchases: true }));
       const response = await fetch(
-        `${BACKEND_URL}/api/admin/marketplace/purchases/${purchaseId}/status`,
+        `/api/admin/marketplace/purchases/${purchaseId}/status`,
         {
           method: 'PUT',
           credentials: 'include',
@@ -214,7 +211,7 @@ const MarketplaceAdmin = () => {
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <img
-                          src={product.images[0]}
+                          src={'/api/'+product.images[0]}
                           alt={product.title}
                           style={{ width: 50, height: 50, objectFit: 'cover' }}
                         />
@@ -435,7 +432,7 @@ const MarketplaceAdmin = () => {
 
                 <Box sx={{ width: 300 }}>
                   <img
-                    src={selectedProduct.images[0]}
+                    src={'/api/'+selectedProduct.images[0]}
                     alt={selectedProduct.title}
                     style={{ width: '100%', borderRadius: 8 }}
                   />
@@ -447,7 +444,7 @@ const MarketplaceAdmin = () => {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <img
-                  src={selectedProduct.owner.profileImage}
+                  src={'/api'+selectedProduct.owner.profileImage}
                   alt={selectedProduct.ownerUsername}
                   style={{ width: 40, height: 40, borderRadius: '50%' }}
                 />

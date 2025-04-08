@@ -21,8 +21,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 
-const BACKEND_URL = 'https://192.168.2.250:3000';
-
 const ProfileHeader = ({ user, onEditClick }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [followersOpen, setFollowersOpen] = useState(false);
@@ -58,7 +56,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
   // Construct the full profile image URL
   const profileImageUrl = user.profileImage?.startsWith('http') 
     ? user.profileImage 
-    : `${BACKEND_URL}${user.profileImage}`;
+    : `${user.profileImage}`;
 
   // Toggle follow status by calling follow/unfollow endpoints
   const handleFollowToggle = async () => {
@@ -67,7 +65,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
       if (isFollowing) {
         // Unfollow user
         const response = await fetch(
-          `${BACKEND_URL}/api/users/unfollow/${user._id}`,
+          `/api/users/unfollow/${user._id}`,
           { method: 'POST', credentials: 'include' }
         );
         if (!response.ok) throw new Error('Failed to unfollow user');
@@ -77,7 +75,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
       } else {
         // Follow user
         const response = await fetch(
-          `${BACKEND_URL}/api/users/follow/${user._id}`,
+          `/api/users/follow/${user._id}`,
           { method: 'POST', credentials: 'include' }
         );
         if (!response.ok) throw new Error('Failed to follow user');
@@ -95,7 +93,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
       <Grid container spacing={3} alignItems="center">
         <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'center' }}>
           <Avatar 
-            src={profileImageUrl}
+            src={"/api/"+profileImageUrl}
             alt={user.username}
             sx={{ 
               width: 150, 
@@ -207,7 +205,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
                     <Avatar 
                       src={follower.profileImage?.startsWith('http') 
                         ? follower.profileImage 
-                        : `${BACKEND_URL}${follower.profileImage}`
+                        : `${follower.profileImage}`
                       } 
                       alt={follower.username} 
                     />
@@ -249,7 +247,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
                     <Avatar 
                       src={follow.profileImage?.startsWith('http') 
                         ? follow.profileImage 
-                        : `${BACKEND_URL}${follow.profileImage}`
+                        : `${follow.profileImage}`
                       } 
                       alt={follow.username} 
                     />

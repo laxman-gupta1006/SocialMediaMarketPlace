@@ -7,7 +7,6 @@ import AddProductDialog from '../components/Marketplace/AddProduct';
 import PaymentDialog from '../components/Marketplace/PaymentDialog';
 import ListedItems from '../components/Marketplace/ListedItems';
 import PurchasedItems from '../components/Marketplace/PurchasedItems';
-import config from '../Config/config';
 
 const MarketplacePage = () => {
   const [products, setProducts] = useState([]);
@@ -34,7 +33,7 @@ const MarketplacePage = () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({ ...searchParams, page, limit: 12 }).toString();
-      const response = await fetch(`${config.BACKEND_URL}/api/marketplace/search?${params}`, {
+      const response = await fetch(`/api/marketplace/search?${params}`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -83,7 +82,7 @@ const MarketplacePage = () => {
   const handlePaymentConfirm = async (paymentData) => {
     try {
       setProcessingPayment(true);
-      const response = await fetch(`${config.BACKEND_URL}/api/marketplace/purchase/${selectedProduct.id}`, {
+      const response = await fetch(`/api/marketplace/purchase/${selectedProduct.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -95,7 +94,7 @@ const MarketplacePage = () => {
 
       const pollStatus = async () => {
         try {
-          const statusResponse = await fetch(`${config.BACKEND_URL}/api/marketplace/purchase/status/${purchaseId}`, {
+          const statusResponse = await fetch(`/api/marketplace/purchase/status/${purchaseId}`, {
             credentials: 'include'
           });
 

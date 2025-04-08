@@ -6,9 +6,6 @@ import {
   Snackbar, Alert
 } from '@mui/material';
 import { CheckCircle, Cancel } from '@mui/icons-material';
-import config from '../../Config/config';
-
-const BACKEND_URL = config.BACKEND_URL;
 
 const VerificationRequests = () => {
   const [requests, setRequests] = useState([]);
@@ -20,7 +17,7 @@ const VerificationRequests = () => {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${BACKEND_URL}/api/admin/verification/requests`, {
+      const response = await fetch(`/api/admin/verification/requests`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Failed to fetch verification requests');
@@ -42,8 +39,8 @@ const VerificationRequests = () => {
     try {
       const endpoint =
         action === 'approve'
-          ? `${BACKEND_URL}/api/admin/verification/approve/${userId}`
-          : `${BACKEND_URL}/api/admin/verification/reject/${userId}`;
+          ? `/api/admin/verification/approve/${userId}`
+          : `/api/admin/verification/reject/${userId}`;
       const response = await fetch(endpoint, {
         method: 'PUT',
         credentials: 'include'

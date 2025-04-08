@@ -12,9 +12,6 @@ import {
 } from '@mui/material';
 import { Search, PersonAdd, Check, Lock } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-import config from '../Config/config';
-
-const BACKEND_URL = config.BACKEND_URL;
 
 const SearchPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +24,7 @@ const SearchPage = () => {
       if (searchQuery.trim().length >= 2) {
         setIsLoading(true);
         try {
-          const res = await fetch(`${BACKEND_URL}/api/users/search?query=${encodeURIComponent(searchQuery)}`, {
+          const res = await fetch(`/api/users/search?query=${encodeURIComponent(searchQuery)}`, {
             credentials: 'include'
           });
           if (!res.ok) throw new Error('Search failed');
@@ -58,7 +55,7 @@ const SearchPage = () => {
       ));
 
       const endpoint = isCurrentlyFollowing ? 'unfollow' : 'follow';
-      const res = await fetch(`${BACKEND_URL}/api/users/${endpoint}/${userId}`, {
+      const res = await fetch(`/api/users/${endpoint}/${userId}`, {
         method: 'POST',
         credentials: 'include'
       });

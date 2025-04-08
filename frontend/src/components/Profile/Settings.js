@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import config from '../../Config/config';
 import RequestVerification from './RequestVerification';
 import AdminNotes from './AdminNotes';
 import { 
@@ -24,7 +23,6 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import LockIcon from '@mui/icons-material/Lock';
 import LogoutIcon from '@mui/icons-material/Logout';
 
-const BACKEND_URL = config.BACKEND_URL;
 
 const Settings = () => {
   const { user, logout } = useAuth();
@@ -41,7 +39,7 @@ const Settings = () => {
     setError('');
     
     try {
-      const res = await fetch(`${BACKEND_URL}/api/users/visibility`, {
+      const res = await fetch(`/api/users/visibility`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -70,7 +68,7 @@ const Settings = () => {
     setError('');
     
     try {
-      const res = await fetch(`${BACKEND_URL}/api/users/two-factor`, {
+      const res = await fetch(`/api/users/two-factor`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json'

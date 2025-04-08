@@ -170,7 +170,7 @@ const Post = ({ post, onLike, onComment, onReport }) => {
         {post.comments.map(comment => (
   <Box key={comment._id} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 1 }}>
     <Avatar 
-      src={comment.profileImage} 
+      src={'/api'+comment.profileImage} 
       sx={{ width: 24, height: 24 }}
       component={RouterLink}
       to={`/profile/${comment.userId}`}

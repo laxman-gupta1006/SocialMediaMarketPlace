@@ -18,9 +18,6 @@ Stack
 } from '@mui/material';
 import { AddPhotoAlternate, Close } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
-import config from '../Config/config';
-
-const BACKEND_URL = config.BACKEND_URL;
 
 const NewPostPage = () => {
 const { user } = useAuth();
@@ -60,7 +57,7 @@ try{
 const formData=new FormData();
 formData.append('media',selectedMediaFile);
 formData.append('caption',caption);
-const response=await fetch(`${BACKEND_URL}/api/posts`,{
+const response=await fetch(`/api/posts`,{
 method:'POST',
 credentials:'include',
 body:formData

@@ -49,7 +49,7 @@ const RequestVerification = () => {
     
     try {
       setUploading(true);
-      const response = await axios.post('https://192.168.2.250:3000/api/verification/request', formData, {
+      const response = await axios.post('/api/verification/request', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         withCredentials: true
       });

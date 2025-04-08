@@ -57,7 +57,7 @@ const AddProductDialog = ({ open, onClose, onSubmit }) => {
     selectedFiles.forEach(file => formData.append('images', file));
 
     try {
-      const response = await fetch('https://192.168.2.250:3000/api/marketplace/AddProduct', {
+      const response = await fetch('/api/marketplace/AddProduct', {
         method: 'POST',
         body: formData,
         credentials: 'include'

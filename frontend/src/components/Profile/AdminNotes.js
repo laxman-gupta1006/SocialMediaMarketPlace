@@ -24,7 +24,7 @@ const AdminNotes = () => {
   useEffect(() => {
     const fetchNotes = async () => {
       try {
-        const res = await axios.get('https://192.168.2.250:3000/api/users/admin-notes', {
+        const res = await axios.get('api/users/admin-notes', {
           withCredentials: true
         });
         setNotes(res.data.notes);

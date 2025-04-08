@@ -23,7 +23,7 @@ const EditProfileDialog = ({ open, onClose, user, onSave }) => {
     setFormData({ ...user });
     setError(null);
     setSelectedPhoto(null);
-    setPhotoPreview(user.profileImage);
+    setPhotoPreview('/api'+user.profileImage);
     setOtp('');
     setOtpSent(false);
     setIsSendingOTP(false);
@@ -45,7 +45,7 @@ const EditProfileDialog = ({ open, onClose, user, onSave }) => {
     try {
       setIsSendingOTP(true);
       setError(null);
-      const response = await fetch('https://192.168.2.250:3000/api/users/send-profile-update-otp', {
+      const response = await fetch('/api/users/send-profile-update-otp', {
         method: 'POST',
         credentials: 'include',
       });
@@ -72,7 +72,7 @@ const EditProfileDialog = ({ open, onClose, user, onSave }) => {
         const photoFormData = new FormData();
         photoFormData.append('photo', selectedPhoto);
 
-        const response = await fetch('https://192.168.2.250:3000/api/users/profile-photo', {
+        const response = await fetch('/api/users/profile-photo', {
           method: 'POST',
           credentials: 'include',
           body: photoFormData

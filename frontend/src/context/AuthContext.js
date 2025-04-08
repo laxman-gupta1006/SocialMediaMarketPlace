@@ -2,9 +2,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import config from '../Config/config';
-
-const BACKEND_URL = config.BACKEND_URL;
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -18,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const checkAuth = async () => {
     console.debug('[checkAuth] Initiating auth check');
     try {
-      const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
+      const res = await fetch(`/api/auth/me`, {
         credentials: 'include',
       });
       console.debug('[checkAuth] Response status:', res.status);
@@ -54,7 +51,7 @@ const login = async (formData = null) => {
     // If no formData is provided, we're in the post-OTP verification flow
     if (!formData) {
       console.debug('[login] No form data provided, checking auth after OTP verification');
-      const res = await fetch(`${BACKEND_URL}/api/auth/me`, {
+      const res = await fetch(`/api/auth/me`, {
         credentials: 'include'
       });
       
@@ -71,7 +68,7 @@ const login = async (formData = null) => {
 
     // Normal login flow with credentials
     console.debug('[login] Attempting login with credentials');
-    const res = await fetch(`${BACKEND_URL}/api/auth/login`, {
+    const res = await fetch(`/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData),
@@ -111,7 +108,7 @@ const login = async (formData = null) => {
     });
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/auth/signup`, {
+      const res = await fetch(`/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -140,7 +137,7 @@ const login = async (formData = null) => {
   const logout = async () => {
     console.debug('[logout] Initiating logout');
     try {
-      const res = await fetch(`${BACKEND_URL}/api/auth/logout`, {
+      const res = await fetch(`/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });

@@ -8,7 +8,7 @@ import {
 import { Delete, Report, CheckCircle, Warning, Close } from '@mui/icons-material';
 import moment from 'moment';
 
-const BACKEND_URL = 'https://192.168.2.250:3000';
+
 
 const ContentModeration = () => {
   const [posts, setPosts] = useState([]);
@@ -34,7 +34,7 @@ const ContentModeration = () => {
         ...filters
       }).toString();
 
-      const response = await fetch(`${BACKEND_URL}/api/admin/posts?${params}`, {
+      const response = await fetch(`/api/admin/posts?${params}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -67,7 +67,7 @@ const ContentModeration = () => {
 
   const handleDeletePost = async (postId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/admin/posts/${postId}`, {
+      const response = await fetch(`/api/admin/posts/${postId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -89,7 +89,7 @@ const ContentModeration = () => {
 
   const handleClearReports = async (postId) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/admin/posts/${postId}/reports`, {
+      const response = await fetch(`/api/admin/posts/${postId}/reports`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
@@ -199,14 +199,14 @@ const ContentModeration = () => {
               <TableRow key={post._id} hover onClick={() => openDetails(post)}>
                 <TableCell>
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <Avatar src={post.author?.profileImage} sx={{ mr: 1 }} />
+                    <Avatar src={'/api'+post.author?.profileImage} sx={{ mr: 1 }} />
                     {post.author?.username || 'Deleted User'}
                   </div>
                 </TableCell>
                 <TableCell>
                   {post.mediaType === 'image' ? (
                     <img
-                      src={post.media}
+                      src={'/api'+post.media}
                       alt="Post media"
                       style={{ width: 60, height: 60, objectFit: 'cover' }}
                     />
@@ -279,7 +279,7 @@ const ContentModeration = () => {
               <div style={{ margin: '20px 0' }}>
                 {selectedPost.mediaType === 'image' ? (
                   <img
-                    src={selectedPost.media}
+                    src={'/api'+selectedPost.media}
                     alt="Post content"
                     style={{ maxWidth: '100%', maxHeight: '400px' }}
                   />

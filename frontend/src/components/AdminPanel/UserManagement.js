@@ -12,10 +12,7 @@ import {
   Visibility, Cancel, AssignmentInd, LockOpen, RestartAlt
 } from '@mui/icons-material';
 import { format } from 'date-fns';
-import config from '../../Config/config';
 import VerificationRequests from './VerificationRequests';
-
-const BACKEND_URL = config.BACKEND_URL;
 
 const UserManagement = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -51,7 +48,7 @@ const UserManagement = () => {
           limit: pagination.limit,
           search
         }).toString();
-        const response = await fetch(`${BACKEND_URL}/api/admin/users?${query}`, {
+        const response = await fetch(`/api/admin/users?${query}`, {
           credentials: 'include'
         });
         if (!response.ok) throw new Error('Failed to fetch users');
@@ -73,7 +70,7 @@ const UserManagement = () => {
     const fetchLogs = async () => {
       try {
         setLoading(prev => ({ ...prev, logs: true }));
-        const response = await fetch(`${BACKEND_URL}/api/admin/logs`, {
+        const response = await fetch(`/api/admin/logs`, {
           credentials: 'include'
         });
         if (!response.ok) throw new Error('Failed to fetch logs');
@@ -92,7 +89,7 @@ const UserManagement = () => {
   const handleVerifyLogs = async () => {
     try {
       setLoading(prev => ({ ...prev, logs: true }));
-      const response = await fetch(`${BACKEND_URL}/api/admin/logs/verify`, {
+      const response = await fetch(`/api/admin/logs/verify`, {
         credentials: 'include'
       });
       if (!response.ok) throw new Error('Log verification failed');
@@ -110,7 +107,7 @@ const UserManagement = () => {
     try {
       setLoading(prev => ({ ...prev, users: true }));
       const response = await fetch(
-        `${BACKEND_URL}/api/admin/users/${userId}/${action}`, 
+        `/api/admin/users/${userId}/${action}`, 
         { method: 'POST', credentials: 'include' }
       );
       if (!response.ok) throw new Error(`${action} failed`);
@@ -137,7 +134,7 @@ const UserManagement = () => {
       if (selectedUser.isAdmin) {
         // Update existing admin permissions
         const response = await fetch(
-          `${BACKEND_URL}/api/admin/admins/permissions/${selectedUser._id}`, 
+          `/api/admin/admins/permissions/${selectedUser._id}`, 
           {
             method: 'PUT',
             credentials: 'include',
@@ -153,7 +150,7 @@ const UserManagement = () => {
       } else {
         // Promote to admin
         const response = await fetch(
-          `${BACKEND_URL}/api/admin/users/${selectedUser._id}/promote`, 
+          `/api/admin/users/${selectedUser._id}/promote`, 
           {
             method: 'POST',
             credentials: 'include',
@@ -191,7 +188,7 @@ const UserManagement = () => {
     try {
       setLoading(prev => ({ ...prev, users: true }));
       const response = await fetch(
-        `${BACKEND_URL}/api/admin/users/${userId}/demote`, 
+        `/api/admin/users/${userId}/demote`, 
         { method: 'POST', credentials: 'include' }
       );
       if (!response.ok) throw new Error('Demotion failed');
@@ -217,7 +214,7 @@ const UserManagement = () => {
     try {
       setLoading(prev => ({ ...prev, users: true }));
       const response = await fetch(
-        `${BACKEND_URL}/api/admin/users/${userId}/clear-lock`,
+        `/api/admin/users/${userId}/clear-lock`,
         { method: 'POST', credentials: 'include' }
       );
       if (!response.ok) throw new Error('Failed to clear lock');
@@ -239,7 +236,7 @@ const UserManagement = () => {
     try {
       setLoading(prev => ({ ...prev, users: true }));
       const response = await fetch(
-        `${BACKEND_URL}/api/admin/users/${userId}/reset-admin-verification`,
+        `/api/admin/users/${userId}/reset-admin-verification`,
         { method: 'POST', credentials: 'include' }
       );
       if (!response.ok) throw new Error('Failed to reset admin verification');
@@ -293,7 +290,7 @@ const UserManagement = () => {
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                         <img
-                          src={user.profileImage}
+                          src={"/api/"+user.profileImage}
                           alt={user.username}
                           style={{ 
                             width: 40, 

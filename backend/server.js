@@ -52,7 +52,9 @@ app.use(cookieParser());
 const allowedOrigins = [
   'https://localhost:3001',
   'https://192.168.2.250:3001',
-  'https://192.168.2.250:3002'
+  'https://192.168.2.250:3002',
+  'https://192.168.2.250',
+  'https://localhost:3003',
 ];
 
 app.use(cors({
@@ -88,15 +90,15 @@ app.use('/uploads', express.static(uploadsDir, {
 
 
 // 7. Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', usersRoutes);
-app.use('/api/posts', postsRoutes);
-app.use('/api/marketplace', marketplaceRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/verification', verificationRoutes);
+app.use('/auth', authRoutes);
+app.use('/users', usersRoutes);
+app.use('/posts', postsRoutes);
+app.use('/marketplace', marketplaceRoutes);
+app.use('/admin', adminRoutes);
+app.use('/verification', verificationRoutes);
 
 // 8. Global error handling middleware
-app.use('/api/messages', messagesRoutes);
+app.use('/messages', messagesRoutes);
 
 // 6. Error handler
 app.use((err, req, res, next) => {
@@ -126,7 +128,7 @@ initSocket(server, allowedOrigins); // Sets up and manages socket events
 
 // 10. Start server
 const PORT = 3000;
-const HOST = '192.168.2.250';
+const HOST = 'localhost';
 
 server.listen(PORT, HOST, () => {
   console.log(`Secure server running on https://${HOST}:${PORT}`);

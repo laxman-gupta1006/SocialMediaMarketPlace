@@ -1,7 +1,6 @@
 // components/Marketplace/PurchasedItems.js
 import React, { useState, useEffect } from 'react';
 import { Grid, Typography, CircularProgress, Card, CardContent, CardMedia, Chip, Box } from '@mui/material';
-import config from '../../Config/config';
 
 const PurchasedItems = () => {
   const [purchases, setPurchases] = useState([]);
@@ -10,7 +9,7 @@ const PurchasedItems = () => {
   useEffect(() => {
     const fetchPurchases = async () => {
       try {
-        const response = await fetch(`${config.BACKEND_URL}/api/marketplace/purchases`, {
+        const response = await fetch(`/api/marketplace/purchases`, {
           credentials: 'include'
         });
         const data = await response.json();
@@ -43,7 +42,7 @@ const PurchasedItems = () => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={"https://192.168.2.250:3000/"+purchase.product.images[0]}
+                  image={"/api/"+purchase.product.images[0]}
                   alt={purchase.product.title}
                 />
                 <CardContent>
