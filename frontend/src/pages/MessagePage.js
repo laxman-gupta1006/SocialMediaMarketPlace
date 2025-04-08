@@ -17,7 +17,6 @@ import MessageBubble from '../components/messages/MessageBubble';
 import MessageInput from '../components/messages/MessageInput';
 import Logo from '../components/Logo';
 
-// Styled components
 const GradientBox = styled(Box)(({ theme }) => ({
   background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
   color: theme.palette.common.white,
@@ -53,7 +52,6 @@ const MessagesPage = () => {
   const messagesEndRef = useRef(null);
   const socket = useRef(null);
 
-  // Effect for responsive drawer
   useEffect(() => {
     setDrawerOpen(!isMobile);
   }, [isMobile]);
@@ -68,19 +66,14 @@ const MessagesPage = () => {
       const success = decipher.finish();
       if (success) {
         const decrypted = decipher.output.toString();
-        console.log("💬 Decrypted Message:", decrypted);
         return decrypted;
-      } else {
-        console.warn("❌ Failed to decrypt message");
-        return '[Decryption Failed]';
       }
+      return '[Decryption Failed]';
     } catch (err) {
-      console.error("⚠️ Decryption error:", err);
       return '[Error Decrypting]';
     }
   };
 
-  // Fetch user information on mount
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -89,7 +82,6 @@ const MessagesPage = () => {
         if (data?._id) setCurrentUserId(data._id);
         setInitialLoading(false);
       } catch (err) {
-        console.error('Error fetching user ID:', err);
         setInitialLoading(false);
       }
     };
@@ -97,19 +89,14 @@ const MessagesPage = () => {
     fetchUser();
   }, []);
 
-  // Handle key exchange once user is authenticated
   useEffect(() => {
     if (!currentUserId) return;
 
     const exchangeKey = async () => {
       try {
-        // Generate RSA key pair
         const keypair = forge.pki.rsa.generateKeyPair({ bits: 2048 });
         const publicKeyPem = forge.pki.publicKeyToPem(keypair.publicKey);
         const privateKeyPem = forge.pki.privateKeyToPem(keypair.privateKey);
-
-        console.log("🔑 Public Key (PEM):\n", publicKeyPem);
-        console.log("🔒 Private Key (PEM):\n", privateKeyPem);
 
         const res = await fetch('/api/messages/exchange-key', {
           method: 'POST',
@@ -120,73 +107,87 @@ const MessagesPage = () => {
 
         const data = await res.json();
         if (res.ok && data.encryptedSymmetricKey) {
-          console.log("📦 Encrypted Symmetric Key (Base64):", data.encryptedSymmetricKey);
-
-          // Decrypt the symmetric key using private key
           const encryptedBytes = forge.util.decode64(data.encryptedSymmetricKey);
           const decryptedSymmetricKey = keypair.privateKey.decrypt(encryptedBytes, 'RSA-OAEP');
-          console.log("🔓 Decrypted Symmetric Key:", decryptedSymmetricKey);
-
-          setSymmetricKey(decryptedSymmetricKey); // Store for later use
-          setPrivateKey(keypair.privateKey);      // Needed for decryption
-        } else {
-          console.error('Key exchange failed:', data.error);
+          setSymmetricKey(decryptedSymmetricKey);
+          setPrivateKey(keypair.privateKey);
         }
       } catch (error) {
-        console.error('Key exchange failed:', error);
       }
     };
 
     exchangeKey();
   }, [currentUserId]);
 
-  // Initialize Socket.IO connection
   useEffect(() => {
     if (!currentUserId) return;
 
-    socket.current = io('/api/', { withCredentials: true });
-
+    socket.current = io("https://192.168.2.250", {
+      withCredentials: true,
+      path: '/socket.io',
+    });
     socket.current.emit('join', currentUserId);
 
     socket.current.on('newMessage', (chatId) => {
-      if (selectedChat?.chatId === chatId) {
-        const fetchAndUpdateMessages = () => {
-          fetch(`/api/messages/get-messages?chatId=${chatId}`, {
+      if (selectedChat?.chatId !== chatId) return;
+
+      const fetchAndUpdateMessages = async () => {
+        try {
+          const res = await fetch(`/api/messages/get-messages?chatId=${chatId}`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include'
-          })
-            .then(res => res.json())
-            .then(data => {
-              if (data.messages) {
-                const decryptedMessages = data.messages.map(msg => ({
-                  ...msg,
-                  text: msg.type === 'text' && symmetricKey && msg.iv ? decryptMessage(msg.text, msg.iv, symmetricKey) : msg.text
-                }));
-                setSelectedChat(prev => ({
-                  ...prev,
-                  messages: decryptedMessages
-                }));
+          });
+
+          const data = await res.json();
+          if (!data.messages) return;
+
+          const decryptedMessages = data.messages.map(msg => {
+            if (['text', 'picture'].includes(msg.type) && symmetricKey && msg.iv) {
+              const decryptedText = decryptMessage(msg.text, msg.iv, symmetricKey);
+          
+              if (msg.type === 'picture') {
+                try {
+                  const parsed = JSON.parse(decryptedText);
+                  return { 
+                    ...msg, 
+                    text: `/uploads/posts/${parsed.fileName}`
+                  };
+                } catch (err) {
+                  if (decryptedText.startsWith('/uploads/')) {
+                    return { ...msg, text: decryptedText };
+                  }
+                  return { ...msg, text: "[Broken Image]" };
+                }
               }
-            })
-            .catch(err => console.error('Error fetching updated messages:', err));
-        };
-        
-        // Add delay only if last message is an image
-        fetch(`/api/messages/get-messages?chatId=${chatId}`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include'
+          
+              return { ...msg, text: decryptedText };
+            }
+          
+            return msg;
+          });
+
+          setSelectedChat(prev => ({
+            ...prev,
+            messages: decryptedMessages
+          }));
+        } catch (err) {
+        }
+      };
+
+      fetch(`/api/messages/get-messages?chatId=${chatId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      })
+        .then(res => res.json())
+        .then(data => {
+          const lastMsg = data.messages?.[data.messages.length - 1];
+          const isImage = lastMsg?.type === 'picture';
+          const delay = isImage ? 1000 : 0;
+          setTimeout(fetchAndUpdateMessages, delay);
         })
-          .then(res => res.json())
-          .then(data => {
-            const lastMsg = data.messages?.[data.messages.length - 1];
-            const isImage = lastMsg?.type === 'picture';
-            const delay = isImage ? 1000 : 0; // 1 second delay for image
-            setTimeout(fetchAndUpdateMessages, delay);
-          })
-          .catch(err => console.error('Error pre-checking message type:', err));
-      }
+        .catch(err => {});
     });
 
     socket.current.on('groupCreated', () => {
@@ -198,7 +199,6 @@ const MessagesPage = () => {
     };
   }, [currentUserId, selectedChat?.chatId, symmetricKey]);
 
-  // Load all conversations
   const loadConversations = async () => {
     setLoadingConversations(true);
     try {
@@ -208,7 +208,7 @@ const MessagesPage = () => {
         credentials: 'include'
       });
       const data = await res.json();
-      
+
       if (Array.isArray(data.chats)) {
         const updated = data.chats.map(chat => {
           const other = chat.participants.find(p => p.userId !== currentUserId);
@@ -232,7 +232,6 @@ const MessagesPage = () => {
         setAvailableUsers(directUsers);
       }
     } catch (err) {
-      console.error('Error loading conversations:', err);
     } finally {
       setLoadingConversations(false);
     }
@@ -244,10 +243,9 @@ const MessagesPage = () => {
     }
   }, [currentUserId, initialLoading]);
 
-  // Load messages for a selected chat
   useEffect(() => {
     if (!selectedChat?.chatId) return;
-    
+
     const loadMessages = async () => {
       setLoadingMessages(true);
       try {
@@ -257,59 +255,53 @@ const MessagesPage = () => {
           credentials: 'include'
         });
         const data = await res.json();
-        
+
         if (data.messages) {
-          const decryptedMessages = data.messages.map(msg => ({
-            ...msg,
-            text: msg.type === 'text' && symmetricKey && msg.iv ? decryptMessage(msg.text, msg.iv, symmetricKey) : msg.text
-          }));
+          const decryptedMessages = data.messages.map(msg => {
+            if (['text', 'picture'].includes(msg.type) && symmetricKey && msg.iv) {
+              let decryptedText = decryptMessage(msg.text, msg.iv, symmetricKey);
+              return { ...msg, text: decryptedText };
+            }
+            return msg;
+          });
+
           setSelectedChat(prev => ({
             ...prev,
             messages: decryptedMessages
           }));
         }
       } catch (err) {
-        console.error('Error loading messages:', err);
       } finally {
         setLoadingMessages(false);
       }
     };
-    
+
     loadMessages();
     socket.current.emit('joinChat', selectedChat.chatId);
-    
+
     return () => {
       socket.current.emit('leaveChat', selectedChat.chatId);
     };
   }, [selectedChat?.chatId, symmetricKey]);
 
-  // Auto-scroll to bottom when messages update
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [selectedChat?.messages]);
 
-  // Handle sending a text message
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedChat?.chatId || !symmetricKey) return;
     try {
-      // 1. Generate random IV
       const iv = forge.random.getBytesSync(16);
-      // 2. Encrypt the message using AES-CBC
       const cipher = forge.cipher.createCipher('AES-CBC', symmetricKey);
       cipher.start({ iv });
       cipher.update(forge.util.createBuffer(newMessage, 'utf8'));
       cipher.finish();
       const encrypted = cipher.output.getBytes();
-      // 3. Base64 encode both encrypted message and IV
       const encryptedBase64 = forge.util.encode64(encrypted);
       const ivBase64 = forge.util.encode64(iv);
-      // Log encryption details
-      console.log("Original Message:", newMessage);
-      console.log("Encrypted (Base64):", encryptedBase64);
-      console.log("IV (Base64):", ivBase64);
-      // 4. Send encrypted message to server
+
       const res = await fetch('/api/messages/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -325,7 +317,7 @@ const MessagesPage = () => {
       if (res.ok && data.newMessage) {
         const newMessageObj = {
           ...data.newMessage,
-          text: newMessage // display plain text locally
+          text: newMessage
         };
         setSelectedChat(prev => ({
           ...prev,
@@ -335,36 +327,70 @@ const MessagesPage = () => {
         setNewMessage('');
       }
     } catch (error) {
-      console.error('Error encrypting/sending message:', error);
     }
   };
 
-  // Handle file uploads
-  const handleFileUpload = ({ file }) => {
-    if (!file || !selectedChat?.chatId) return;
-    const formData = new FormData();
-    formData.append('image', file);
-    formData.append('chatId', selectedChat.chatId);
-    fetch('/api/messages/send-message', {
-      method: 'POST',
-      credentials: 'include',
-      body: formData
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.newMessage) {
+  const handleFileUpload = async ({ file }) => {
+    if (!file || !selectedChat?.chatId || !symmetricKey) return;
+
+    try {
+      const fileReader = new FileReader();
+
+      fileReader.onload = async (event) => {
+        const arrayBuffer = event.target.result;
+        const binaryBuffer = forge.util.createBuffer(arrayBuffer);
+        const fileName = file.name;
+      
+        const filePayload = JSON.stringify({
+          fileData: forge.util.encode64(binaryBuffer.getBytes()),
+          fileName: fileName
+        });
+      
+        const iv = forge.random.getBytesSync(16);
+        const cipher = forge.cipher.createCipher('AES-CBC', symmetricKey);
+        cipher.start({ iv });
+        cipher.update(forge.util.createBuffer(filePayload, 'utf8'));
+        cipher.finish();
+      
+        const encrypted = cipher.output.getBytes();
+        const encryptedBase64 = forge.util.encode64(encrypted);
+        const ivBase64 = forge.util.encode64(iv);
+      
+        const res = await fetch('/api/messages/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            chatId: selectedChat.chatId,
+            text: encryptedBase64,
+            iv: ivBase64,
+            type: 'picture'
+          })
+        });
+      
+        const data = await res.json();
+        if (res.ok && data.newMessage) {
+          const newMessageObj = {
+            ...data.newMessage,
+            text: `data:image/${file.type.split('/')[1]};base64,${forge.util.encode64(binaryBuffer.getBytes())}`
+          };
+      
           setSelectedChat(prev => ({
             ...prev,
-            messages: [...prev.messages, data.newMessage]
+            messages: [...(prev.messages || []), newMessageObj]
           }));
-          // Notify others in the chat
-          socket.current.emit('newMessage', selectedChat.chatId);
+      
+          setTimeout(() => {
+            socket.current.emit('newMessage', selectedChat.chatId);
+          }, 5000);
         }
-      })
-      .catch(err => console.error('Error sending file:', err));
+      };
+
+      fileReader.readAsArrayBuffer(file);
+    } catch (error) {
+    }
   };
 
-  // Handle group creation
   const handleCreateGroup = () => {
     if (!groupName.trim()) return setGroupError('Group name is required.');
     if (selectedUsers.length < 2) return setGroupError('Select at least 2 members.');
@@ -395,11 +421,9 @@ const MessagesPage = () => {
       })
       .catch(err => {
         setGroupError('Failed to create group.');
-        console.error('Group creation error:', err);
       });
   };
 
-  // Handle user selection for groups
   const handleCheckboxChange = (userId) => {
     setSelectedUsers(prev =>
       prev.includes(userId)
@@ -408,7 +432,6 @@ const MessagesPage = () => {
     );
   };
 
-  // Handler for when a conversation is selected
   const handleConversationSelect = (chat) => {
     if (selectedChat?.chatId !== chat.chatId) {
       setSelectedChat(chat);
@@ -418,12 +441,10 @@ const MessagesPage = () => {
     }
   };
 
-  // Toggle sidebar drawer for mobile
   const toggleDrawer = () => {
     setDrawerOpen(prev => !prev);
   };
 
-  // Loading overlay component
   const LoadingOverlay = () => (
     <Fade in={initialLoading} timeout={500}>
       <Box
@@ -534,7 +555,6 @@ const MessagesPage = () => {
 
   return (
     <Box sx={{ height: '100vh', overflow: 'hidden', position: 'relative', display: 'flex' }}>
-      {/* Sidebar for desktop */}
       {!isMobile ? (
         <Box sx={{ width: drawerOpen ? '320px' : 0, transition: 'width 0.3s ease' }}>
           {drawerOpen && renderSidebar()}
@@ -556,7 +576,6 @@ const MessagesPage = () => {
         </Drawer>
       )}
       
-      {/* Chat area */}
       <Box sx={{ 
         flex: 1, 
         display: 'flex', 
@@ -676,7 +695,6 @@ const MessagesPage = () => {
         )}
       </Box>
 
-      {/* Group creation dialog */}
       <Dialog open={openGroupModal} onClose={() => setOpenGroupModal(false)} fullWidth maxWidth="sm">
         <DialogTitle>
           <Typography variant="h6">Create New Group</Typography>

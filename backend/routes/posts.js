@@ -170,31 +170,40 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 
+// GET /posts/user/:userId
 router.get('/user/:userId', authMiddleware, async (req, res) => {
   try {
-    const targetUser = await User.findById(req.params.userId)
-    .select('privacySettings followers');
+    const targetUserId = req.params.userId;
 
-  if (!targetUser) return res.status(404).json({ error: 'User not found' });
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
 
-  const isOwner = targetUser._id.equals(req.userId);
-  const isFollowing = targetUser.followers.some(f => f.userId.equals(req.userId));
-  
-  if (targetUser.privacySettings.profileVisibility === 'private' && !isOwner && !isFollowing) {
-    return res.status(200).json({ 
-      posts: [], 
-      total: 0,
-      isPrivate: true,
-      message: 'This account is private. Follow to see their posts.'
-    });
-  }
+    const targetUser = await User.findById(targetUserId).select('privacySettings followers');
 
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
-  // Fetch posts if visible
-  const posts = await Post.find({ userId: targetUser._id })
-    .sort({ createdAt: -1 })
-    .populate('userId', 'username profileImage')
-    .lean();
+    const currentUserObjectId = new mongoose.Types.ObjectId(req.userId);
+    const isOwner = targetUser._id.equals(currentUserObjectId);
+    const isFollowing = targetUser.followers.some(f => f.userId.equals(currentUserObjectId));
+
+    if (targetUser.privacySettings.profileVisibility === 'private' && !isOwner && !isFollowing) {
+      return res.status(200).json({
+        posts: [],
+        total: 0,
+        isPrivate: true,
+        message: 'This account is private. Follow to see their posts.'
+      });
+    }
+
+    // Fetch posts if visible
+    const posts = await Post.find({ userId: targetUser._id })
+      .sort({ createdAt: -1 })
+      .populate('userId', 'username profileImage')
+      .lean();
 
     console.log("Found Posts:", posts.length);
 
@@ -204,11 +213,11 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
           _id: post._id?.toString(),
           userId: post.userId?._id?.toString(),
           username: post.userId?.username || 'Unknown User',
-          profileImage: post.userId?.profileImage 
-            ? `/api${post.userId.profileImage}` 
+          profileImage: post.userId?.profileImage
+            ? `/api${post.userId.profileImage}`
             : '/default-profile.png',
-          media: post.media 
-            ? `/api${post.media}` 
+          media: post.media
+            ? `/api${post.media}`
             : '/default-media.png',
           mediaType: post.mediaType || 'image',
           caption: post.caption || '',
@@ -217,14 +226,14 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
             _id: comment._id?.toString(),
             userId: comment.userId?.toString(),
             username: comment.username || 'Unknown User',
-            profileImage: comment.profileImage 
-              ? `/api${comment.profileImage}` 
+            profileImage: comment.profileImage
+              ? `/api${comment.profileImage}`
               : '/default-profile.png',
             text: comment.text || '',
             createdAt: comment.createdAt
           })),
-          hasLiked: (post.likes || []).some(like => 
-            mongoose.Types.ObjectId(like).equals(currentUserObjectId)
+          hasLiked: (post.likes || []).some(like =>
+            new mongoose.Types.ObjectId(like).equals(currentUserObjectId)
           ),
           createdAt: post.createdAt
         };
@@ -234,15 +243,15 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
       }
     }).filter(post => post !== null);
 
-    res.status(200).json({ 
+    res.status(200).json({
       posts: formattedPosts,
-      total: formattedPosts.length 
+      total: formattedPosts.length
     });
 
   } catch (error) {
     console.error('Get user posts FULL error:', error);
-    res.status(500).json({ 
-      error: 'Failed to fetch user posts', 
+    res.status(500).json({
+      error: 'Failed to fetch user posts',
       details: error.message,
       stack: error.stack
     });
@@ -259,7 +268,6 @@ const checkPostAccess = async (postId, userId) => {
     author.followers.some(f => f.userId.equals(userId));
 };
 
-// Like/Unlike post
 // Like/Unlike post - Updated version
 router.put('/like/:postId', authMiddleware, async (req, res) => {
   const hasAccess = await checkPostAccess(req.params.postId, req.userId);

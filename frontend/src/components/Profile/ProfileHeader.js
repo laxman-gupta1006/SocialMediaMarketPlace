@@ -27,15 +27,14 @@ const ProfileHeader = ({ user, onEditClick }) => {
   const [followingOpen, setFollowingOpen] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
+  const [followLoading, setFollowLoading] = useState(false);
   const { user: currentUser } = useAuth();
   const { userId } = useParams();
 
-  // Update follow state when user prop or currentUser changes
   useEffect(() => {
     if (user && currentUser) {
       const following = user.followers?.some(
-        (follower) =>
-          follower.userId.toString() === currentUser._id.toString()
+        (follower) => follower.userId.toString() === currentUser._id.toString()
       );
       setIsFollowing(following);
       setFollowersCount(user.followers?.length || 0);
@@ -50,41 +49,37 @@ const ProfileHeader = ({ user, onEditClick }) => {
     );
   }
 
-  // Check if the profile being viewed belongs to the current user
   const isCurrentUser = !userId || (currentUser && user._id === currentUser._id);
 
-  // Construct the full profile image URL
   const profileImageUrl = user.profileImage?.startsWith('http') 
     ? user.profileImage 
     : `${user.profileImage}`;
 
-  // Toggle follow status by calling follow/unfollow endpoints
   const handleFollowToggle = async () => {
-    if (!currentUser) return;
+    if (!currentUser || followLoading) return;
+
+    setFollowLoading(true);
+
     try {
-      if (isFollowing) {
-        // Unfollow user
-        const response = await fetch(
-          `/api/users/unfollow/${user._id}`,
-          { method: 'POST', credentials: 'include' }
-        );
-        if (!response.ok) throw new Error('Failed to unfollow user');
-        const data = await response.json();
-        setIsFollowing(false);
-        setFollowersCount(data.followersCount || followersCount - 1);
-      } else {
-        // Follow user
-        const response = await fetch(
-          `/api/users/follow/${user._id}`,
-          { method: 'POST', credentials: 'include' }
-        );
-        if (!response.ok) throw new Error('Failed to follow user');
-        const data = await response.json();
-        setIsFollowing(true);
-        setFollowersCount(data.followersCount || followersCount + 1);
-      }
+      const endpoint = isFollowing
+        ? `/api/users/unfollow/${user._id}`
+        : `/api/users/follow/${user._id}`;
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) throw new Error(`Failed to ${isFollowing ? 'unfollow' : 'follow'} user`);
+
+      const data = await response.json();
+
+      setIsFollowing(!isFollowing);
+      setFollowersCount(data.followersCount ?? (isFollowing ? followersCount - 1 : followersCount + 1));
     } catch (error) {
       console.error(error);
+    } finally {
+      setFollowLoading(false);
     }
   };
 
@@ -93,7 +88,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
       <Grid container spacing={3} alignItems="center">
         <Grid item xs={12} md={3} sx={{ display: 'flex', justifyContent: 'center' }}>
           <Avatar 
-            src={"/api/"+profileImageUrl}
+            src={`/api/${profileImageUrl}`}
             alt={user.username}
             sx={{ 
               width: 150, 
@@ -127,12 +122,18 @@ const ProfileHeader = ({ user, onEditClick }) => {
                   </IconButton>
                 </>
               ) : (
-                <Button 
-                  variant="contained" 
+                <Button
+                  variant={isFollowing ? 'outlined' : 'contained'}
+                  color={isFollowing ? 'secondary' : 'primary'}
                   onClick={handleFollowToggle}
-                  sx={{ textTransform: 'none', px: 3 }}
+                  sx={{ textTransform: 'none', px: 3, minWidth: 120 }}
+                  disabled={followLoading}
                 >
-                  {isFollowing ? 'Unfollow' : 'Follow'}
+                  {followLoading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    isFollowing ? 'Unfollow' : 'Follow'
+                  )}
                 </Button>
               )}
             </div>
@@ -174,7 +175,7 @@ const ProfileHeader = ({ user, onEditClick }) => {
         </Grid>
       </Grid>
 
-      {/* Settings Dialog - Only relevant for current user */}
+      {/* Settings Dialog */}
       {isCurrentUser && (
         <Dialog
           open={settingsOpen}

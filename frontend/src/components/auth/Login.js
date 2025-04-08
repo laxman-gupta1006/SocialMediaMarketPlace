@@ -167,28 +167,6 @@ const Login = () => {
                     {loading ? 'Logging in...' : 'Continue to Sphere'}
                   </Button>
                 </Grid>
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 2 }}>
-                    <Typography variant="body2" color="text.secondary">Or connect with</Typography>
-                  </Divider>
-                </Grid>
-                <Grid item xs={12}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="large"
-                    startIcon={<Google />}
-                    onClick={handleGoogleLogin}
-                    sx={{
-                      borderRadius: 1.5,
-                      textTransform: 'none',
-                      py: 1.5,
-                      fontWeight: 600
-                    }}
-                  >
-                    Continue with Google
-                  </Button>
-                </Grid>
               </Grid>
             </form>
           ) : (

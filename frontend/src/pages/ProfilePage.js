@@ -14,7 +14,7 @@ const ProfilePage = () => {
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [profileError, setProfileError] = useState(null);
   const [postsError, setPostsError] = useState(null);
-  const { userId } = useParams(); // Get userId from URL params
+  const { userId } = useParams();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -24,15 +24,19 @@ const ProfilePage = () => {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
+
         if (!res.ok) {
-          throw new Error('Failed to fetch user profile');
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to fetch user profile');
         }
-        // Note: backend returns the user object directly, not wrapped in "user"
+
         const data = await res.json();
         setUserProfile(data);
+        setProfileError(null);
       } catch (error) {
         console.error('Error fetching user profile:', error);
         setProfileError(error.message);
+        setUserProfile(null);
       }
     };
 
@@ -45,13 +49,15 @@ const ProfilePage = () => {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
+
         if (!res.ok) {
           const errorData = await res.json();
           throw new Error(errorData.error || 'Failed to fetch posts');
         }
+
         const data = await res.json();
         if (data.isPrivate) {
-          setPostsError(data.message); // "This account is private..."
+          setPostsError(data.message);
         } else {
           setPosts(data.posts);
         }
@@ -107,14 +113,20 @@ const ProfilePage = () => {
     );
   }
 
-  // If the profile fetch failed, you might want to show something here.
-  // But if you want to show the profile section regardless,
-  // you can choose to display a fallback or an error message only in the profile header.
-  // For now, we will continue rendering and simply log the error.
+  if (profileError) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
+        <Typography color="error" variant="h6">
+          {profileError === 'User not found' ? 'User not found.' : profileError}
+        </Typography>
+      </Box>
+    );
+  }
+
   if (!userProfile) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
-        <Typography>{profileError ? profileError : 'Loading profile...'}</Typography>
+        <Typography>Loading profile...</Typography>
       </Box>
     );
   }
@@ -127,7 +139,7 @@ const ProfilePage = () => {
       backgroundColor: '#fafafa',
       pt: 4
     }}>
-      <Paper sx={{ 
+      <Paper sx={{
         p: { xs: 2, sm: 4 },
         mb: 8,
         borderRadius: 4,
@@ -136,13 +148,13 @@ const ProfilePage = () => {
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
         overflow: 'hidden'
       }}>
-        <ProfileHeader 
-          user={userProfile} 
-          onEditClick={() => setEditOpen(true)} 
+        <ProfileHeader
+          user={userProfile}
+          onEditClick={() => setEditOpen(true)}
         />
 
-        <Typography variant="h6" sx={{ 
-          mb: 3, 
+        <Typography variant="h6" sx={{
+          mb: 3,
           textAlign: 'center',
           fontWeight: 600,
           color: 'text.secondary',

@@ -32,7 +32,7 @@ const ForgotPassword = () => {
     setLoading(true);
     setError('');
     try {
-      await axios.post('https://192.168.2.250:3000/api/auth/send-password-reset-otp', { username: email });
+      await axios.post('/api/auth/send-password-reset-otp', { username: email });
       setSuccess('OTP sent to your email');
       setActiveStep(1);
     } catch (err) {
@@ -46,7 +46,7 @@ const ForgotPassword = () => {
     setLoading(true);
     setError('');
     try {
-      await axios.post('https://192.168.2.250:3000/api/auth/reset-password', {
+      await axios.post('/api/auth/reset-password', {
         username: email,
         otp,
         newPassword

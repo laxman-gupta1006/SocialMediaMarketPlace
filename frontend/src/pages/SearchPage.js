@@ -1,56 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import {
-  TextField,
-  Avatar,
-  Grid,
-  Typography,
-  Paper,
-  Button,
-  CircularProgress,
-  Box,
-  Tooltip
+  TextField, Avatar, Grid, Typography, Paper, Button,
+  CircularProgress, Box, Tooltip
 } from '@mui/material';
 import { Search, PersonAdd, Check, Lock } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
+
 
 const SearchPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [allResults, setAllResults] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(6);
   const [isLoading, setIsLoading] = useState(false);
   const { user: currentUser } = useAuth();
 
-  useEffect(() => {
-    const searchUsers = async () => {
-      if (searchQuery.trim().length >= 2) {
-        setIsLoading(true);
-        try {
-          const res = await fetch(`/api/users/search?query=${encodeURIComponent(searchQuery)}`, {
-            credentials: 'include'
-          });
-          if (!res.ok) throw new Error('Search failed');
-          const data = await res.json();
-          setSearchResults(data);
-        } catch (error) {
-          console.error('Search error:', error);
-          setSearchResults([]);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setSearchResults([]);
-      }
-    };
+  const fetchResults = async (query) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/users/search?query=${encodeURIComponent(query)}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Search failed');
+      const data = await res.json();
+      setAllResults(data);
+      setVisibleCount(6); // reset view count on new fetch
+    } catch (err) {
+      console.error('Search error:', err);
+      setAllResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const debounceTimer = setTimeout(searchUsers, 300);
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      fetchResults(searchQuery.trim());
+    }, 300);
     return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    // On first mount, show suggestions
+    fetchResults('');
+  }, []);
+
   const handleFollow = async (userId) => {
     try {
-      const userToUpdate = searchResults.find(user => user._id === userId);
+      const userToUpdate = allResults.find(user => user._id === userId);
       const isCurrentlyFollowing = userToUpdate.isFollowing;
 
-      setSearchResults(prev => prev.map(user =>
+      setAllResults(prev => prev.map(user =>
         user._id === userId ? { ...user, isProcessing: true } : user
       ));
 
@@ -61,11 +61,10 @@ const SearchPage = () => {
       });
 
       if (!res.ok) throw new Error('Action failed');
-
       const data = await res.json();
 
-      setSearchResults(prevResults =>
-        prevResults.map(user =>
+      setAllResults(prev =>
+        prev.map(user =>
           user._id === userId
             ? {
               ...user,
@@ -78,25 +77,23 @@ const SearchPage = () => {
       );
     } catch (error) {
       console.error('Follow/Unfollow error:', error);
-      setSearchResults(prev => prev.map(user =>
+      setAllResults(prev => prev.map(user =>
         user._id === userId ? { ...user, isProcessing: false } : user
       ));
     }
   };
 
+  const handleShowMore = () => {
+    setVisibleCount(prev => prev + 6);
+  };
+
+  const visibleUsers = allResults.slice(0, visibleCount);
+
   return (
     <Paper sx={{
-      width: '90%',
-      maxWidth: 900,
-      mx: 'auto',
-      mt: 4,
-      p: 3,
-      borderRadius: 4,
-      boxShadow: 3,
-      backgroundColor: 'background.paper',
-      border: '1px solid #e0e0e0',
-      minHeight: '70vh',
-      transition: 'all 0.3s ease-in-out'
+      width: '90%', maxWidth: 900, mx: 'auto', mt: 4, p: 3, borderRadius: 4,
+      boxShadow: 3, backgroundColor: 'background.paper', border: '1px solid #e0e0e0',
+      minHeight: '70vh', transition: 'all 0.3s ease-in-out'
     }}>
       <TextField
         fullWidth
@@ -119,78 +116,93 @@ const SearchPage = () => {
         <Box display="flex" justifyContent="center" py={4}>
           <CircularProgress />
         </Box>
-      ) : searchResults.length > 0 ? (
-        <Grid container spacing={2}>
-          {searchResults.map(user => (
-            <Grid item xs={12} key={user._id}>
-              <Paper sx={{
-                p: 2,
-                display: 'flex',
-                alignItems: 'center',
-                borderRadius: '12px',
-                transition: 'all 0.2s',
-                '&:hover': {
-                  boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)'
-                }
-              }}>
-                <Avatar
-                  src={user.profileImage}
-                  sx={{
-                    width: 56,
-                    height: 56,
-                    mr: 2,
-                    border: user.isPrivate ? '2px solid #ff9800' : 'none'
-                  }}
-                />
-                <Box sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {user.username}
-                    </Typography>
-                    {user.isPrivate && (
-                      <Tooltip title="Private account" arrow>
-                        <Lock color="action" sx={{ ml: 1, fontSize: '18px' }} />
-                      </Tooltip>
-                    )}
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {user.fullName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {user.followersCount} followers
-                  </Typography>
-                </Box>
-                {user._id !== currentUser?._id && (
-                  <Button
-                    variant={user.isFollowing ? "outlined" : "contained"}
-                    startIcon={user.isFollowing ? <Check /> : <PersonAdd />}
-                    onClick={() => handleFollow(user._id)}
-                    disabled={user.isProcessing}
+      ) : visibleUsers.length > 0 ? (
+        <>
+          <Grid container spacing={2}>
+            {visibleUsers.map(user => (
+              <Grid item xs={12} key={user._id}>
+                <Paper sx={{
+                  p: 2, display: 'flex', alignItems: 'center', borderRadius: '12px',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)'
+                  }
+                }}>
+                  <Avatar
+                    src={user.profileImage}
                     sx={{
-                      textTransform: 'none',
-                      borderRadius: '20px',
-                      minWidth: '100px',
-                      ...(user.isProcessing ? {
-                        backgroundColor: 'action.disabled',
-                        pointerEvents: 'none'
-                      } : {})
+                      width: 56, height: 56, mr: 2,
+                      border: user.isPrivate ? '2px solid #ff9800' : 'none'
                     }}
-                  >
-                    {user.isFollowing ? 'Unfollow' : 'Follow'}
-                  </Button>
-                )}
-              </Paper>
-            </Grid>
-          ))}
-        </Grid>
+                  />
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography
+  component={Link}
+  to={`/profile/${user._id}`}
+  variant="h6"
+  sx={{
+    fontWeight: 600,
+    textDecoration: 'none',
+    color: 'inherit',
+    '&:hover': {
+      textDecoration: 'underline',
+      color: 'primary.main'
+    }
+  }}
+>
+  {user.username}
+</Typography>
+
+                      {user.isPrivate && (
+                        <Tooltip title="Private account" arrow>
+                          <Lock color="action" sx={{ ml: 1, fontSize: '18px' }} />
+                        </Tooltip>
+                      )}
+                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      {user.fullName}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {user.followersCount} followers
+                    </Typography>
+                  </Box>
+                  {user._id !== currentUser?._id && (
+                    <Button
+                      variant={user.isFollowing ? "outlined" : "contained"}
+                      startIcon={user.isFollowing ? <Check /> : <PersonAdd />}
+                      onClick={() => handleFollow(user._id)}
+                      disabled={user.isProcessing}
+                      sx={{
+                        textTransform: 'none',
+                        borderRadius: '20px',
+                        minWidth: '100px',
+                        ...(user.isProcessing ? {
+                          backgroundColor: 'action.disabled',
+                          pointerEvents: 'none'
+                        } : {})
+                      }}
+                    >
+                      {user.isFollowing ? 'Unfollow' : 'Follow'}
+                    </Button>
+                  )}
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+          {visibleCount < allResults.length && (
+            <Box display="flex" justifyContent="center" mt={3}>
+              <Button onClick={handleShowMore} variant="outlined" sx={{ borderRadius: '20px' }}>
+                Show More
+              </Button>
+            </Box>
+          )}
+        </>
       ) : (
         searchQuery && (
           <Box sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            py: 4,
-            textAlign: 'center'
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            py: 4, textAlign: 'center'
           }}>
             <Search sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
             <Typography variant="h6" color="text.secondary">

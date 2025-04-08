@@ -94,8 +94,12 @@ const UserManagement = () => {
       });
       if (!response.ok) throw new Error('Log verification failed');
       const result = await response.json();
-      setVerifyResult(result.message || 'Logs verified successfully');
-      setSuccess(result.message || 'Logs verified successfully');
+      setVerifyResult(result.message);
+      if (result.valid) {
+        setSuccess(result.message);
+      } else {
+        setError(result.message);
+      }
     } catch (err) {
       setError(err.message);
     } finally {

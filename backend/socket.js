@@ -9,7 +9,9 @@ function initSocket(server, allowedOrigins) {
       origin: allowedOrigins,
       credentials: true,
       methods: ["GET", "POST"]
-    }
+    },
+    path: '/socket.io',  // Make sure this matches your client configuration
+    transports: ['websocket', 'polling']  // Explicitly define transports
   });
 
   ioInstance.on("connection", (socket) => {

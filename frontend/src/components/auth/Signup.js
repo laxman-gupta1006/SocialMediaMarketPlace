@@ -86,7 +86,7 @@ const Signup = () => {
     setSuccess('');
 
     try {
-      await axios.post('https://192.168.2.250:3000/api/auth/send-otp', {
+      await axios.post('/api/auth/send-otp', {
         email: formData.email
       });
       setSuccess('OTP sent successfully! Please check your email.');
@@ -105,13 +105,13 @@ const Signup = () => {
     setSuccess('');
 
     try {
-      await axios.post('https://192.168.2.250:3000/api/auth/signup-with-otp', {
+      await axios.post('/api/auth/signup-with-otp', {
         ...formData,
         otp
       });
       setSuccess('Account created successfully!');
       setTimeout(() => {
-        navigate('/dashboard');
+        navigate('/');
       }, 1500);
     } catch (err) {
       setError(err.response?.data?.error || 'Verification failed');

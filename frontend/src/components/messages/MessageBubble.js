@@ -11,9 +11,7 @@ const MessageBubble = ({ message, currentUserId, isGroup }) => {
   const isPicture = message.type === 'picture';
   const isFile = message.type === 'file';
 
-  const fileUrl = message.text.startsWith('http') 
-    ? message.text 
-    : `https://192.168.2.250:3000/${message.text}`;
+  const fileUrl = `/api${message.text}`;
 
   return (
     <Box
@@ -30,7 +28,6 @@ const MessageBubble = ({ message, currentUserId, isGroup }) => {
         </Typography>
       )}
 
-      {/* 🖼️ Render Image */}
       {isPicture ? (
         <img
           src={fileUrl}

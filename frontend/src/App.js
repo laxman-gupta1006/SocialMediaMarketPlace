@@ -1,7 +1,16 @@
 // App.js
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
-import { CssBaseline, ThemeProvider, createTheme, Box, Typography, Button } from '@mui/material';
+import { 
+  CssBaseline, 
+  ThemeProvider, 
+  createTheme, 
+  Box, 
+  Typography, 
+  Button, 
+  IconButton 
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import Login from './components/auth/Login';
 import Signup from './components/auth/Signup';
 import MainPage from './pages/MainPage';
@@ -30,11 +39,11 @@ const theme = createTheme({
           left: 0,
           right: 0,
           zIndex: 1000,
-          borderTop: '1px solid rgba(0, 0, 0, 0.12)'
-        }
-      }
-    }
-  }
+          borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+        },
+      },
+    },
+  },
 });
 
 // ProtectedRoute ensures the user is logged in.
@@ -65,6 +74,7 @@ const VerifiedRoute = ({ children }) => {
 
 const App = () => {
   const { user, loading, error } = useAuth();
+  const [showBanner, setShowBanner] = useState(true);
 
   if (loading) return <Loading />;
 
@@ -81,72 +91,98 @@ const App = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', pb: '72px' }}>
-        {/* Banner shown on top when user is not verified */}
-        {user && !user.verification?.adminVerified && (
-          <Box
-            sx={{
-              background: 'linear-gradient(to right, #ff7043, #ff9800)',
-              color: 'white',
-              p: 3,
-              borderRadius: 3,
-              textAlign: 'center',
-              boxShadow: 4,
-              mb: 3,
-            }}
-          >
-            <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
-              🚫 Your Account is Not Admin Verified
-            </Typography>
+        {/* Minimal, one-line closable banner shown on top when user is not verified */}
+{/* Neumorphic Warning Banner */}
+{user && !user.verification?.adminVerified && showBanner && (
+  <Box
+    sx={{
+      width: '100%',
+      px: 3,
+      py: 2,
+      background: 'linear-gradient(135deg, rgba(255, 0, 130, 0.1), rgba(0, 255, 255, 0.1))',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      borderRadius: '16px',
+      backdropFilter: 'blur(10px)',
+      WebkitBackdropFilter: 'blur(10px)',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      mt: 3,
+      mx: 'auto',
+      maxWidth: '90%',
+    }}
+  >
+    <Typography 
+      variant="body2" 
+      color="text.primary" 
+      sx={{ flex: 1, ml: 1, fontWeight: 500 }}
+    >
+      🚫 Access to <strong>Chats</strong> and <strong>Marketplace</strong> is restricted. Enable Two-Factor Authentication for better security.
+    </Typography>
 
-            <Typography variant="body1" sx={{ mb: 1.5 }}>
-              Access to <strong>Chats</strong> and <strong>Marketplace</strong> is currently <span style={{ textDecoration: 'underline' }}>restricted</span>.
-            </Typography>
+    <Button
+      variant="contained"
+      size="small"
+      href="/profile"
+      sx={{
+        background: 'linear-gradient(135deg, #00FFA3, #DC1FFF)',
+        color: '#fff',
+        textTransform: 'none',
+        mx: 2,
+        borderRadius: '9999px',
+        fontSize: '0.75rem',
+        fontWeight: 'bold',
+        boxShadow: '0 0 10px rgba(220, 31, 255, 0.4)',
+        '&:hover': {
+          background: 'linear-gradient(135deg, #00e695, #c51be6)',
+        },
+      }}
+    >
+      Profile Settings
+    </Button>
 
-            <Typography variant="body2" sx={{ mb: 1 }}>
-              📄 You can <strong>request verification</strong> or update your profile from your <em>Profile Settings</em>.
-            </Typography>
+    <IconButton 
+      size="small" 
+      onClick={() => setShowBanner(false)} 
+      sx={{ color: '#888' }}
+    >
+      <CloseIcon fontSize="small" />
+    </IconButton>
+  </Box>
+)}
 
-            {!user.verification?.twoFactorEnabled && (
-              <Typography variant="body2" sx={{ mt: 2, backgroundColor: '#fff3cd', color: '#856404', p: 1.5, borderRadius: 2 }}>
-                🔐 <strong>Security Alert:</strong> Enable <strong>Two-Factor Authentication</strong> to protect your account.
-              </Typography>
-            )}
 
-            <Box sx={{ mt: 3 }}>
-              <a href="/settings/profile" style={{ textDecoration: 'none' }}>
-                <Box
-                  component="button"
-                  sx={{
-                    backgroundColor: '#ffffff',
-                    color: '#ff7043',
-                    fontWeight: 'bold',
-                    px: 3,
-                    py: 1,
-                    borderRadius: 2,
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: 2,
-                    transition: 'all 0.3s ease-in-out',
-                    '&:hover': {
-                      backgroundColor: '#ffe0b2',
-                    },
-                  }}
-                >
-                  Go to Profile Settings
-                </Box>
-              </a>
-            </Box>
-          </Box>
-        )}
+{/* Neumorphic Admin Panel Button */}
+{user?.roles?.includes('admin') && !window.location.href.includes('/admin') && (
+  <Box sx={{ position: 'fixed', bottom: 80, right: 16, zIndex: 1100 }}>
+    <Button
+      variant="contained"
+      component={Link}
+      to="/admin"
+      sx={{
+        background: 'linear-gradient(135deg, #18FFFF, #2979FF)',
+        color: '#fff',
+        borderRadius: '9999px',
+        textTransform: 'none',
+        fontWeight: 'bold',
+        px: 4,
+        py: 1.5,
+        boxShadow: '0 0 12px rgba(41,121,255,0.6)',
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          background: 'linear-gradient(135deg, #00e5ff, #1e88e5)',
+          boxShadow: '0 0 20px rgba(41,121,255,0.8)',
+        },
+      }}
+    >
+      Admin Panel
+    </Button>
+  </Box>
+)}
 
-        {/* Show Admin Panel button if user is an admin */}
-        {user && user.roles?.includes('admin') && (
-          <Box sx={{ position: 'fixed', top: 16, right: 16, zIndex: 2000 }}>
-            <Button variant="contained" color="secondary" component={Link} to="/admin">
-              Admin Panel
-            </Button>
-          </Box>
-        )}
+
+
 
         <Routes>
           {/* Public Routes */}
@@ -231,7 +267,7 @@ const App = () => {
 
           <Route path="/error/server-down" element={<ServerDownPage />} />
           {/* Fallback Route */}
-          {/* <Route path="*" element={<NotFoundPage />} /> */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Box>
     </ThemeProvider>

@@ -10,6 +10,8 @@ const Message = require("../models/Message");
 const mongoose = require("mongoose");
 const forge = require("node-forge");
 const crypto = require("crypto");
+const fs = require("fs");
+
 
 // ✅ Use getIO from socket.js (not server.js anymore)
 const { getIO } = require("../socket");
@@ -215,7 +217,7 @@ router.get("/get-messages", authMiddleware, async (req, res) => {
 
 // ✅ Send a new message (with socket.io emit)
 // ✅ Send a new message (emit only a signal to refetch)
-router.post("/send-message", authMiddleware, upload.single("image"), async (req, res) => {
+router.post("/send-message", authMiddleware, async (req, res) => {
   try {
     console.log("Received message data:", req.body);
 
@@ -233,29 +235,64 @@ router.post("/send-message", authMiddleware, upload.single("image"), async (req,
       type,
     };
 
-    if (req.file) {
-      // If it's an image message, just store the file
-      messageData.text = `/uploads/posts/${req.file.filename}`;
-      messageData.type = "picture";
-    } else {
-      if (!text || !ivBase64) {
-        return res.status(400).json({ error: "Encrypted text and IV are required." });
+    if (!text || !ivBase64) {
+      return res.status(400).json({ error: "Encrypted data and IV are required." });
+    }
+
+    const userKeyInfo = userSymmetricKeys[sender];
+    if (!userKeyInfo) {
+      return res.status(400).json({ error: "Symmetric key not initialized for user." });
+    }
+
+    const symmetricKey = userKeyInfo.key;
+    const iv = Buffer.from(ivBase64, "base64");
+    const encryptedData = text;
+
+    // 🔓 Decrypt data before storing
+    const decipher = crypto.createDecipheriv("aes-256-cbc", Buffer.from(symmetricKey, "binary"), iv);
+    let decrypted = decipher.update(encryptedData, "base64", "utf8");
+    decrypted += decipher.final("utf8");
+
+    if (type === "picture") {
+      // Handle decrypted image data
+      try {
+        const filePayload = JSON.parse(decrypted);
+    
+        // Extract file data and name
+        const { fileData, fileName } = filePayload;
+    
+        // Generate a unique filename
+        const uniqueFileName = `${Date.now()}-${uuidv4()}-${fileName}`;
+        const filePath = path.join(__dirname, '../uploads/posts', uniqueFileName);
+    
+        // fileData is already base64 — no prefix to remove anymore
+        const base64Data = fileData;
+    
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(path.join(__dirname, '../uploads/posts'))) {
+          fs.mkdirSync(path.join(__dirname, '../uploads/posts'), { recursive: true });
+        }
+    
+        // Write the file to disk
+        fs.writeFileSync(filePath, base64Data, { encoding: 'base64' });
+        console.log('file path is')
+        console.log(filePath)
+        
+    
+        // Store the file path in the database
+        messageData.text = `/uploads/posts/${uniqueFileName}`;
+        messageData.type = "picture";
+        console.log('file saved at ')
+        console.log(messageData.text)
+
+        
+      } catch (error) {
+        console.error("Error processing encrypted image:", error);
+        return res.status(400).json({ error: "Invalid encrypted image data" });
       }
-
-      const userKeyInfo = userSymmetricKeys[sender];
-      if (!userKeyInfo) {
-        return res.status(400).json({ error: "Symmetric key not initialized for user." });
-      }
-
-      const symmetricKey = userKeyInfo.key;
-      const iv = Buffer.from(ivBase64, "base64");
-      const encryptedText = text;
-
-      // 🔓 Decrypt text before storing
-      const decipher = crypto.createDecipheriv("aes-256-cbc", Buffer.from(symmetricKey, "binary"), iv);
-      let decrypted = decipher.update(encryptedText, "base64", "utf8");
-      decrypted += decipher.final("utf8");
-
+    }
+     else {
+      // For regular text messages
       messageData.text = decrypted;
     }
 

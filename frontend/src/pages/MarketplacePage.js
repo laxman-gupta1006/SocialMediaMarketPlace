@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Grid, CircularProgress, Box, Snackbar, Tabs, Tab, Alert } from '@mui/material';
+import {
+  Grid, CircularProgress, Box, Snackbar, Tabs, Tab, Alert
+} from '@mui/material';
 import MarketplaceLogo from '../components/Marketplace/Marketplacelogo';
 import ProductCard from '../components/Marketplace/ProductCard';
 import SearchBar from '../components/Marketplace/SearchBar';
@@ -82,7 +84,8 @@ const MarketplacePage = () => {
   const handlePaymentConfirm = async (paymentData) => {
     try {
       setProcessingPayment(true);
-      const response = await fetch(`/api/marketplace/purchase/${selectedProduct.id}`, {
+      console.log(selectedProduct);
+      const response = await fetch(`/api/marketplace/purchase/${selectedProduct.productId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -92,6 +95,7 @@ const MarketplacePage = () => {
       if (!response.ok) throw new Error('Payment initiation failed');
       const { purchaseId } = await response.json();
 
+      // Polling for the payment status
       const pollStatus = async () => {
         try {
           const statusResponse = await fetch(`/api/marketplace/purchase/status/${purchaseId}`, {
@@ -161,7 +165,7 @@ const MarketplacePage = () => {
           <Grid container spacing={4}>
             {products.map((product) => (
               <Grid item xs={12} sm={6} lg={4} key={product.id}>
-                <ProductCard product={product} onBuy={() => handleBuyProduct(product)} />
+                <ProductCard product={product} onBuy={handleBuyProduct} />
               </Grid>
             ))}
           </Grid>

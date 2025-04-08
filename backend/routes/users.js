@@ -266,52 +266,69 @@ router.put('/update', authMiddleware, async (req, res) => {
   }
 });
 
-// @route   GET /api/users/search
-// @desc    Global search for users by username or full name
-// @access  Private
 router.get('/search', authMiddleware, async (req, res) => {
   try {
-    const { query } = req.query;
-
-    if (!query || query.trim().length < 2) {
-      return res.status(400).json({ error: 'Search query must be at least 2 characters' });
-    }
+    const { query = '', limit = 6, skip = 0 } = req.query;
+    const parsedLimit = parseInt(limit);
+    const parsedSkip = parseInt(skip);
 
     const currentUser = await User.findById(req.userId);
     if (!currentUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const searchResults = await User.find({
-      $or: [
-        { username: { $regex: query, $options: 'i' } },
-        { fullName: { $regex: query, $options: 'i' } }
-      ],
-      _id: { $ne: req.userId }
-    })
-    .select('username fullName profileImage privacySettings followers following')
-    .limit(20)
-    .lean();
+    let users = [];
 
-    const resultsWithStatus = searchResults.map(user => {
+    if (!query.trim() || query.trim().length < 2) {
+      // Return random users (excluding current user)
+      users = await User.aggregate([
+        { $match: { _id: { $ne: currentUser._id } } },
+        { $sample: { size: 50 } }, // sample more than needed
+        {
+          $project: {
+            _id: 1,
+            username: 1,
+            fullName: 1,
+            profileImage: 1,
+            privacySettings: 1,
+            followers: 1,
+            following: 1
+          }
+        }
+      ]);
+      users = users.slice(parsedSkip, parsedSkip + parsedLimit); // Paginate manually
+    } else {
+      users = await User.find({
+        $or: [
+          { username: { $regex: query, $options: 'i' } },
+          { fullName: { $regex: query, $options: 'i' } }
+        ],
+        _id: { $ne: req.userId }
+      })
+        .select('username fullName profileImage privacySettings followers following')
+        .skip(parsedSkip)
+        .limit(parsedLimit)
+        .lean();
+    }
+
+    const resultsWithStatus = users.map(user => {
       const isFollowing = currentUser.following.some(
         u => u.userId?.toString() === user._id.toString()
       );
-
       const isPrivate = user.privacySettings?.profileVisibility === 'private';
       const redacted = isPrivate && !isFollowing;
 
       return {
         _id: user._id,
-        username: user.username, // Keep username always visible for follow actions
+        username: user.username,
         fullName: redacted ? 'Private Account' : user.fullName,
         profileImage: redacted
           ? '/default-private.png'
-          : (user.profileImage ? `https://192.168.2.250:3000${user.profileImage}` : '/default-profile.png'),
+          : (user.profileImage ? `/api${user.profileImage}` : '/default-profile.png'),
         followersCount: user.followers.length,
         isPrivate,
         isFollowing,
-        canFollow: true // explicitly say this account can be followed
+        canFollow: true
       };
     });
 
@@ -321,6 +338,7 @@ router.get('/search', authMiddleware, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
 
 
 // // Updated follow route with error handling

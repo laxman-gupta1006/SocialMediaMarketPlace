@@ -1,4 +1,3 @@
-// src/components/AdminPanel/AdminHeader.jsx
 import React from 'react';
 import { 
   AppBar,
@@ -6,12 +5,31 @@ import {
   IconButton,
   Typography,
   Avatar,
-  Stack,Box
+  Stack,
+  Box
 } from '@mui/material';
 import { Menu, Logout } from '@mui/icons-material';
 import Logo from '../Logo';
+import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const AdminHeader = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      // Call your logout API to clear the cookie on the server
+      await axios.post('/api/auth/logout', {}, {
+        withCredentials: true  // ensure cookies are sent
+      });
+
+      // Redirect to login
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
+
   return (
     <AppBar 
       position="fixed" 
@@ -40,7 +58,7 @@ const AdminHeader = () => {
         <Stack direction="row" alignItems="center" spacing={2}>
           <Avatar sx={{ bgcolor: 'primary.main' }}>A</Avatar>
           <Typography variant="subtitle1">Admin</Typography>
-          <IconButton>
+          <IconButton onClick={handleLogout}>
             <Logout />
           </IconButton>
         </Stack>

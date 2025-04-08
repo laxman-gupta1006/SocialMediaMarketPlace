@@ -43,7 +43,7 @@ app.use(limiter);
 
 // 4. Body parser with increased limit for image uploads,
 // XSS protection, and MongoDB sanitization
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '100mb' }));
 app.use(xss());
 app.use(mongoSanitize());
 app.use(cookieParser());

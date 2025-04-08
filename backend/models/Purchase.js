@@ -49,4 +49,28 @@ const purchaseSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+purchaseSchema.pre('save', function (next) {
+  if (
+    this.isModified('paymentDetails') &&
+    this.paymentMethod === 'credit' &&
+    typeof this.paymentDetails === 'object'
+  ) {
+    const details = this.paymentDetails;
+
+    // Mask card number - show only last 4 digits
+    if (details.cardNumber && typeof details.cardNumber === 'string') {
+      const last4 = details.cardNumber.slice(-4);
+      this.paymentDetails.cardNumber = `**** **** **** ${last4}`;
+    }
+
+    // Mask CVV - always ***
+    if (details.cvv) {
+      this.paymentDetails.cvv = '***';
+    }
+  }
+
+  next();
+});
+
+
 module.exports = mongoose.model("Purchase", purchaseSchema);
