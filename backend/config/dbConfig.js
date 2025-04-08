@@ -1,6 +1,10 @@
+require("dotenv").config(); // Load .env variables
+
 const mongoose = require("mongoose");
 
-mongoose.connect("mongodb://socialsphereUser:StrongPassword123@192.168.2.250:27017/socialsphere", {
+const MONGO_URI = process.env.MONGO_URI;
+
+mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 }).then(() => {
